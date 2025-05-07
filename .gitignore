@@ -1,0 +1,6 @@
+*.env
+sent_log.json
+venv
+build
+instaloader_bot.egg-info
+*.idea

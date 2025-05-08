@@ -7,7 +7,7 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! 👋 Добро пожаловать, как и обещал в Instagram :)")
+    await update.message.reply_text("Привет! 👋 Добро пожаловать, как и обещал вот твои файлы :)")
 
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))

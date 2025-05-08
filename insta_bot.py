@@ -49,7 +49,7 @@ def main():
         except Exception as e:
             print(f"⚠️ Ошибка: {e}")
 
-        time.sleep(5)  # Проверка раз в минуту
+        time.sleep(60)  # Проверка раз в минуту
 
 if __name__ == "__main__":
     main()

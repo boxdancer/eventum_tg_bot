@@ -35,10 +35,13 @@ TELEGRAM_BOT_LINK=https://t.me/your_bot_username
 
 ## ✅ You're Ready!
 
-After these steps, the project should be ready to run by:
+After these steps, the project should be ready to run locally by:
 ```bash
-python tg_bot.py
-python insta_bot.py
+python run.py
+```
+If you want to run bots in docker container, run in project root directory:
+```bash
+docker-compose up
 ```
 ---
 

@@ -1,6 +1,7 @@
 *.env
 sent_log.json
-venv
+*venv
 build
 instaloader_bot.egg-info
 *.idea
+*.egg-info

@@ -54,34 +54,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Отложенное сообщение
-async def send_delayed_message(message, text: str, delay: int, user: str):
+async def send_delayed_message(message, text: str, delay: int, username: str):
     await asyncio.sleep(delay)
     await message.reply_text(text)
-    logger.warning("Cообщение отправлено пользователю: %s спустя: %d с", user, delay)
+    logger.warning("Cообщение отправлено пользователю: %s спустя: %d с", username, delay)
+
+
+async def process_exam_choice(message, exam: str, username: str):
+    await message.reply_text(f"Вот первый файл {exam}")
+    logger.warning("Первое сообщение %s отправлено пользователю: %s", exam, username)
+    asyncio.create_task(send_delayed_message(message, f"Вот второй файл {exam}", DELAY_MSG_MIN_20, username))
+    asyncio.create_task(send_delayed_message(message, f"Вот третий файл {exam}", DELAY_MSG_MIN_40, username))
 
 
 # Обработка нажатий на inline-кнопки
 async def handle_inline_choice(update: Update, *args, **kwargs):
     query = update.callback_query
     await query.answer()
-
     user_choice = query.data
-
     match user_choice:
         case ExamType.EGE:
-            await query.message.reply_text("Вот первый файл ЕГЭ")
-            logger.warning("Первое сообщение ЕГЭ отправлено пользователю: %s", query.from_user.name)
-            asyncio.create_task(
-                send_delayed_message(query.message, "Вот второй файл ЕГЭ", DELAY_MSG_MIN_20, query.from_user.name))
-            asyncio.create_task(
-                send_delayed_message(query.message, "Вот третий файл ЕГЭ", DELAY_MSG_MIN_40, query.from_user.name))
+            await asyncio.create_task(
+                process_exam_choice(query.message, ExamType.EGE.value, query.from_user.name)
+            )
         case ExamType.OGE:
-            await query.message.reply_text("Вот первый файл ОГЭ")
-            logger.warning("Первое сообщение ОГЭ отправлено пользователю: %s", query.from_user.name)
-            asyncio.create_task(
-                send_delayed_message(query.message, "Вот второй файл ОГЭ", DELAY_MSG_MIN_20, query.from_user.name))
-            asyncio.create_task(
-                send_delayed_message(query.message, "Вот третий файл ОГЭ", DELAY_MSG_MIN_40, query.from_user.name))
+            await asyncio.create_task(
+                process_exam_choice(query.message, ExamType.OGE.value, query.from_user.name)
+            )
         case _:
             pass
 

@@ -74,11 +74,11 @@ async def handle_inline_choice(update: Update, *args, **kwargs):
     user_choice = query.data
     match user_choice:
         case ExamType.EGE:
-            await asyncio.create_task(
+            asyncio.create_task(
                 process_exam_choice(query.message, ExamType.EGE.value, query.from_user.name)
             )
         case ExamType.OGE:
-            await asyncio.create_task(
+            asyncio.create_task(
                 process_exam_choice(query.message, ExamType.OGE.value, query.from_user.name)
             )
         case _:

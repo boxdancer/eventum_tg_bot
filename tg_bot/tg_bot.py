@@ -33,7 +33,8 @@ from constants.constants import (
     OGE_MESSAGE_1,
     OGE_MESSAGE_2,
     OGE_MESSAGE_3,
-    OGE_MESSAGE_4,
+    OGE_MESSAGE_4, TEXT_EGE_BTN_1, URL_EGE_BTN_1, TEXT_EGE_BTN_3, URL_EGE_BTN_3, TEXT_OGE_BTN_1, URL_OGE_BTN_1,
+    TEXT_OGE_BTN_3, URL_OGE_BTN_3, TEXT_OGE_BTN_4, URL_OGE_BTN_4, TEXT_EGE_BTN_4, URL_EGE_BTN_4,
 )
 
 # Logger setup
@@ -45,8 +46,26 @@ logger = logging.getLogger(__name__)
 # Loading envs
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+OWNER_ID = os.getenv("OWNER_ID")
 if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not found in .env")
+
+
+class Button:
+    def __init__(self, text: str, url: str | None = None, callback_data: str | None = None):
+        self.text = text
+        self.url = url
+        self.callback_data = callback_data
+        if not (url or callback_data):
+            raise ValueError("Button must have either 'url' or 'callback_data'")
+
+    def to_telegram(self) -> InlineKeyboardButton:
+        return InlineKeyboardButton(self.text, url=self.url, callback_data=self.callback_data)
+
+    @staticmethod
+    def create_markup(buttons: list[list["Button"]]) -> InlineKeyboardMarkup:
+        keyboard = [[button.to_telegram() for button in row] for row in buttons]
+        return InlineKeyboardMarkup(keyboard)
 
 
 class BotHandler:
@@ -56,16 +75,19 @@ class BotHandler:
         self.application: Application = ApplicationBuilder().token(self.token).build()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [
+        buttons = [
             [
-                InlineKeyboardButton(text=ExamType.OGE, callback_data=ExamType.OGE),
-                InlineKeyboardButton(text=ExamType.EGE, callback_data=ExamType.EGE),
+                Button(text=ExamType.OGE, callback_data=ExamType.OGE),
+                Button(text=ExamType.EGE, callback_data=ExamType.EGE)
             ]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = Button.create_markup(buttons)
+        # Direct message to the bot owner about potential customer
+        msg = f"/start triggered by user: @{update.message.chat.username}"
+        await context.bot.send_message(chat_id=OWNER_ID, text=msg)
         if update.message:
             await update.message.reply_text(GREETING_MESSAGE, reply_markup=reply_markup)
-            logger.warning("/start triggered by user: %s", update.message.chat.username)
+            logger.warning(msg)
 
     async def handle_inline_choice(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -82,51 +104,96 @@ class BotHandler:
             case ExamType.EGE:
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, EGE_MESSAGE_1, DELAY_MSG_0, username
+                        message=message,
+                        text=EGE_MESSAGE_1,
+                        delay=DELAY_MSG_0,
+                        username=username,
+                        button=Button(
+                            text=TEXT_EGE_BTN_1,
+                            url=URL_EGE_BTN_1,
+                        )
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, EGE_MESSAGE_2, DELAY_MSG_20, username
+                        message=message, text=EGE_MESSAGE_2, delay=DELAY_MSG_20, username=username,
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, EGE_MESSAGE_3, DELAY_MSG_50, username
+                        message=message,
+                        text=EGE_MESSAGE_3,
+                        delay=DELAY_MSG_50,
+                        username=username,
+                        button=Button(
+                            text=TEXT_EGE_BTN_3,
+                            url=URL_EGE_BTN_3,
+                        )
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, EGE_MESSAGE_4, DELAY_MSG_80, username
+                        message=message,
+                        text=EGE_MESSAGE_4,
+                        delay=DELAY_MSG_80,
+                        username=username,
+                        button=Button(
+                            text=TEXT_EGE_BTN_4,
+                            url=URL_EGE_BTN_4,
+                        )
                     )
                 )
             case ExamType.OGE:
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, OGE_MESSAGE_1, DELAY_MSG_0, username
+                        message=message,
+                        text=OGE_MESSAGE_1,
+                        delay=DELAY_MSG_0,
+                        username=username,
+                        button=Button(
+                            text=TEXT_OGE_BTN_1,
+                            url=URL_OGE_BTN_1,
+                        )
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, OGE_MESSAGE_2, DELAY_MSG_20, username
+                        message=message, text=OGE_MESSAGE_2, delay=DELAY_MSG_20, username=username,
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, OGE_MESSAGE_3, DELAY_MSG_50, username
+                        message=message,
+                        text=OGE_MESSAGE_3,
+                        delay=DELAY_MSG_50,
+                        username=username,
+                        button=Button(
+                            text=TEXT_OGE_BTN_3,
+                            url=URL_OGE_BTN_3,
+                        )
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message, OGE_MESSAGE_4, DELAY_MSG_80, username
+                        message=message,
+                        text=OGE_MESSAGE_4,
+                        delay=DELAY_MSG_80,
+                        username=username,
+                        button=Button(
+                            text=TEXT_OGE_BTN_4,
+                            url=URL_OGE_BTN_4,
+                        )
                     )
                 )
 
     async def send_delayed_message(
-        self, message: Message, text: str, delay: int, username: str
+        self, message: Message, text: str, delay: int, username: str, button: Button | None = None
     ):
         await asyncio.sleep(delay)
-        await message.reply_text(text)
+        reply_markup = None
+        if button:
+            reply_markup = Button.create_markup([[button]])
+        await message.reply_text(text, reply_markup=reply_markup)
         logger.warning("Message delivered to user: %s after %d s", username, delay)
 
     async def run(self):

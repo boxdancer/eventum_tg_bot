@@ -1,13 +1,14 @@
+import asyncio
 import logging
 import os
-import asyncio
-import enum
 
+from dotenv import load_dotenv
 from telegram import (
     Update,
     Bot,
     InlineKeyboardMarkup,
-    InlineKeyboardButton, BotCommand,
+    InlineKeyboardButton,
+    BotCommand,
     Message,
 )
 from telegram.ext import (
@@ -17,28 +18,35 @@ from telegram.ext import (
     CallbackQueryHandler,
     Application,
 )
-from dotenv import load_dotenv
 
-# Настройка логирования
+from constants.constants import (
+    GREETING_MESSAGE,
+    EGE_MESSAGE_1,
+    EGE_MESSAGE_2,
+    EGE_MESSAGE_3,
+    DELAY_MSG_50,
+    DELAY_MSG_20,
+    DELAY_MSG_0,
+    EGE_MESSAGE_4,
+    DELAY_MSG_80,
+    ExamType,
+    OGE_MESSAGE_1,
+    OGE_MESSAGE_2,
+    OGE_MESSAGE_3,
+    OGE_MESSAGE_4,
+)
+
+# Logger setup
 logging.basicConfig(
     level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Загрузка переменных окружения
+# Loading envs
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не найден в .env")
-
-# Константы задержки
-DELAY_MSG_1 = 4
-DELAY_MSG_2 = 8
-
-
-class ExamType(str, enum.Enum):
-    OGE = "ОГЭ"
-    EGE = "ЕГЭ"
+    raise ValueError("TELEGRAM_BOT_TOKEN not found in .env")
 
 
 class BotHandler:
@@ -48,17 +56,20 @@ class BotHandler:
         self.application: Application = ApplicationBuilder().token(self.token).build()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[
-            InlineKeyboardButton(text=ExamType.OGE, callback_data=ExamType.OGE),
-            InlineKeyboardButton(text=ExamType.EGE, callback_data=ExamType.EGE),
-        ]]
+        keyboard = [
+            [
+                InlineKeyboardButton(text=ExamType.OGE, callback_data=ExamType.OGE),
+                InlineKeyboardButton(text=ExamType.EGE, callback_data=ExamType.EGE),
+            ]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        msg = "Привет! 👋 Добро пожаловать! Какой экзамен сдаешь? :)"
         if update.message:
-            await update.message.reply_text(msg, reply_markup=reply_markup)
+            await update.message.reply_text(GREETING_MESSAGE, reply_markup=reply_markup)
             logger.warning("/start triggered by user: %s", update.message.chat.username)
 
-    async def handle_inline_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_inline_choice(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         query = update.callback_query
         if not query:
             return
@@ -69,30 +80,67 @@ class BotHandler:
 
         match user_choice:
             case ExamType.EGE:
-                asyncio.create_task(self.process_exam_choice(message, ExamType.EGE.value, username))
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, EGE_MESSAGE_1, DELAY_MSG_0, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, EGE_MESSAGE_2, DELAY_MSG_20, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, EGE_MESSAGE_3, DELAY_MSG_50, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, EGE_MESSAGE_4, DELAY_MSG_80, username
+                    )
+                )
             case ExamType.OGE:
-                asyncio.create_task(self.process_exam_choice(message, ExamType.OGE.value, username))
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, OGE_MESSAGE_1, DELAY_MSG_0, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, OGE_MESSAGE_2, DELAY_MSG_20, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, OGE_MESSAGE_3, DELAY_MSG_50, username
+                    )
+                )
+                asyncio.create_task(
+                    self.send_delayed_message(
+                        message, OGE_MESSAGE_4, DELAY_MSG_80, username
+                    )
+                )
 
-    async def process_exam_choice(self, message: Message, exam: str, username: str):
-        await message.reply_text(f"Вот первый файл {exam}")
-        logger.warning("Первое сообщение %s отправлено пользователю: %s", exam, username)
-
-        asyncio.create_task(self.send_delayed_message(message, f"Вот второй файл {exam}", DELAY_MSG_1, username))
-        asyncio.create_task(self.send_delayed_message(message, f"Вот третий файл {exam}", DELAY_MSG_2, username))
-
-    async def send_delayed_message(self, message: Message, text: str, delay: int, username: str):
+    async def send_delayed_message(
+        self, message: Message, text: str, delay: int, username: str
+    ):
         await asyncio.sleep(delay)
         await message.reply_text(text)
-        logger.warning("Сообщение отправлено пользователю: %s спустя %d сек", username, delay)
+        logger.warning("Message delivered to user: %s after %d s", username, delay)
 
     async def run(self):
-        # Очистка старых апдейтов
+        # Skip messages while bot offline
         pending_updates = await self.bot.get_updates()
-        logger.warning("❗ Пропущено входящих сообщений: %s", len(pending_updates))
+        logger.warning(
+            "❗ Messages skipped while bot inactive: %s", len(pending_updates)
+        )
 
-        await self.bot.set_my_commands([
-            BotCommand(command="start", description="Начать заново"),
-        ])
+        await self.bot.set_my_commands(
+            [
+                BotCommand(command="start", description="Начать заново"),
+            ]
+        )
 
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CallbackQueryHandler(self.handle_inline_choice))
@@ -101,7 +149,7 @@ class BotHandler:
         await self.application.start()
         await self.application.updater.start_polling(drop_pending_updates=True)
 
-        logger.warning("🟢 Telegram бот запущен...")
+        logger.warning("🟢 Telegram bot started...")
         await asyncio.Event().wait()
 
 

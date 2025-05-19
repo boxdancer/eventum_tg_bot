@@ -194,7 +194,7 @@ class BotHandler:
         if button:
             reply_markup = Button.create_markup([[button]])
         await message.reply_text(text, reply_markup=reply_markup)
-        logger.warning("Message delivered to user: %s after %d s", username, delay)
+        logger.warning("Message delivered to user: %s after %d min", username, delay // 60)
 
     async def run(self):
         # Skip messages while bot offline

@@ -33,8 +33,19 @@ from constants.constants import (
     OGE_MESSAGE_1,
     OGE_MESSAGE_2,
     OGE_MESSAGE_3,
-    OGE_MESSAGE_4, TEXT_EGE_BTN_1, URL_EGE_BTN_1, TEXT_EGE_BTN_3, URL_EGE_BTN_3, TEXT_OGE_BTN_1, URL_OGE_BTN_1,
-    TEXT_OGE_BTN_3, URL_OGE_BTN_3, TEXT_OGE_BTN_4, URL_OGE_BTN_4, TEXT_EGE_BTN_4, URL_EGE_BTN_4,
+    OGE_MESSAGE_4,
+    TEXT_EGE_BTN_1,
+    URL_EGE_BTN_1,
+    TEXT_EGE_BTN_3,
+    URL_EGE_BTN_3,
+    TEXT_OGE_BTN_1,
+    URL_OGE_BTN_1,
+    TEXT_OGE_BTN_3,
+    URL_OGE_BTN_3,
+    TEXT_OGE_BTN_4,
+    URL_OGE_BTN_4,
+    TEXT_EGE_BTN_4,
+    URL_EGE_BTN_4,
 )
 
 # Logger setup
@@ -52,7 +63,9 @@ if not TOKEN:
 
 
 class Button:
-    def __init__(self, text: str, url: str | None = None, callback_data: str | None = None):
+    def __init__(
+        self, text: str, url: str | None = None, callback_data: str | None = None
+    ):
         self.text = text
         self.url = url
         self.callback_data = callback_data
@@ -60,7 +73,9 @@ class Button:
             raise ValueError("Button must have either 'url' or 'callback_data'")
 
     def to_telegram(self) -> InlineKeyboardButton:
-        return InlineKeyboardButton(self.text, url=self.url, callback_data=self.callback_data)
+        return InlineKeyboardButton(
+            self.text, url=self.url, callback_data=self.callback_data
+        )
 
     @staticmethod
     def create_markup(buttons: list[list["Button"]]) -> InlineKeyboardMarkup:
@@ -78,7 +93,7 @@ class BotHandler:
         buttons = [
             [
                 Button(text=ExamType.OGE, callback_data=ExamType.OGE),
-                Button(text=ExamType.EGE, callback_data=ExamType.EGE)
+                Button(text=ExamType.EGE, callback_data=ExamType.EGE),
             ]
         ]
         reply_markup = Button.create_markup(buttons)
@@ -111,12 +126,15 @@ class BotHandler:
                         button=Button(
                             text=TEXT_EGE_BTN_1,
                             url=URL_EGE_BTN_1,
-                        )
+                        ),
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message=message, text=EGE_MESSAGE_2, delay=DELAY_MSG_20, username=username,
+                        message=message,
+                        text=EGE_MESSAGE_2,
+                        delay=DELAY_MSG_20,
+                        username=username,
                     )
                 )
                 asyncio.create_task(
@@ -128,7 +146,7 @@ class BotHandler:
                         button=Button(
                             text=TEXT_EGE_BTN_3,
                             url=URL_EGE_BTN_3,
-                        )
+                        ),
                     )
                 )
                 asyncio.create_task(
@@ -140,7 +158,7 @@ class BotHandler:
                         button=Button(
                             text=TEXT_EGE_BTN_4,
                             url=URL_EGE_BTN_4,
-                        )
+                        ),
                     )
                 )
             case ExamType.OGE:
@@ -153,12 +171,15 @@ class BotHandler:
                         button=Button(
                             text=TEXT_OGE_BTN_1,
                             url=URL_OGE_BTN_1,
-                        )
+                        ),
                     )
                 )
                 asyncio.create_task(
                     self.send_delayed_message(
-                        message=message, text=OGE_MESSAGE_2, delay=DELAY_MSG_20, username=username,
+                        message=message,
+                        text=OGE_MESSAGE_2,
+                        delay=DELAY_MSG_20,
+                        username=username,
                     )
                 )
                 asyncio.create_task(
@@ -170,7 +191,7 @@ class BotHandler:
                         button=Button(
                             text=TEXT_OGE_BTN_3,
                             url=URL_OGE_BTN_3,
-                        )
+                        ),
                     )
                 )
                 asyncio.create_task(
@@ -182,19 +203,26 @@ class BotHandler:
                         button=Button(
                             text=TEXT_OGE_BTN_4,
                             url=URL_OGE_BTN_4,
-                        )
+                        ),
                     )
                 )
 
     async def send_delayed_message(
-        self, message: Message, text: str, delay: int, username: str, button: Button | None = None
+        self,
+        message: Message,
+        text: str,
+        delay: int,
+        username: str,
+        button: Button | None = None,
     ):
         await asyncio.sleep(delay)
         reply_markup = None
         if button:
             reply_markup = Button.create_markup([[button]])
         await message.reply_text(text, reply_markup=reply_markup)
-        logger.warning("Message delivered to user: %s after %d min", username, delay // 60)
+        logger.warning(
+            "Message delivered to user: %s after %d min", username, delay // 60
+        )
 
     async def run(self):
         # Skip messages while bot offline

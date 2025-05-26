@@ -6,6 +6,7 @@ services:
     env_file: .env  # Указываем .env в текущей директории
     volumes:
       - ./tg_bot:/app
+      - ./constants:/app/constants
     restart: unless-stopped
 
   insta_bot:

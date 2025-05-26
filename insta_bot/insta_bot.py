@@ -7,8 +7,7 @@ import json
 import time
 
 logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,7 @@ TG_BOT_LINK = os.getenv("TELEGRAM_BOT_LINK")
 # Файл, где будут храниться ID уже обработанных комментариев
 LOG_FILE = "sent_log.json"
 
+
 # Загрузка обработанных комментов
 def load_sent_log():
     if os.path.exists(LOG_FILE):
@@ -29,9 +29,11 @@ def load_sent_log():
             return set(json.load(f))
     return set()
 
+
 def save_sent_log(sent_ids):
     with open(LOG_FILE, "w") as f:
         json.dump(list(sent_ids), f)
+
 
 def main():
     logger.warning("🔐 Вход в Instagram...")
@@ -43,7 +45,9 @@ def main():
 
     while True:
         try:
-            media_id = cl.media_pk_from_url(f"https://www.instagram.com/p/{POST_SHORTCODE}/")
+            media_id = cl.media_pk_from_url(
+                f"https://www.instagram.com/p/{POST_SHORTCODE}/"
+            )
             comments = cl.media_comments(media_id)
 
             for comment in comments:
@@ -58,6 +62,7 @@ def main():
             logger.exception("⚠️ Ошибка: ")
 
         time.sleep(60)  # Проверка раз в минуту
+
 
 if __name__ == "__main__":
     main()

@@ -5,14 +5,19 @@ WORKDIR /app
 # Установка Poetry
 RUN pip install poetry
 
-# Копируем только pyproject.toml для установки зависимостей
-COPY pyproject.toml .
+# Копируем pyproject.toml для зависимостей
+COPY tg_bot/pyproject.toml ./tg_bot/pyproject.toml
 
-# Настройка Poetry и установка только "main" зависимостей (без dev)
+# Устанавливаем зависимости
+WORKDIR /app/tg_bot
 RUN poetry config virtualenvs.create false && poetry install --no-root --only main
 
-# Копируем остальной код
+# Возвращаемся в корень и копируем всё
+WORKDIR /app
 COPY . .
 
-# Стартовая команда по умолчанию
-CMD ["python3", "tg_bot.py"]
+# Делаем constants доступным
+ENV PYTHONPATH=/app
+
+# Запуск
+CMD ["python3", "tg_bot/tg_bot.py"]

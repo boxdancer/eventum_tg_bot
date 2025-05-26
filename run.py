@@ -2,8 +2,10 @@ import subprocess
 import os
 import sys
 
+
 def run_bot(script_path):
     return subprocess.Popen([sys.executable, script_path])
+
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))

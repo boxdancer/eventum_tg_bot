@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from io import BytesIO
 
 from dotenv import load_dotenv
 from telegram import (
@@ -11,6 +12,7 @@ from telegram import (
     BotCommand,
     Message,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -46,6 +48,7 @@ from constants.constants import (
     URL_OGE_BTN_4,
     TEXT_EGE_BTN_4,
     URL_EGE_BTN_4,
+    GREETING_PHOTO,
 )
 
 # Logger setup
@@ -101,7 +104,12 @@ class BotHandler:
         msg = f"/start triggered by user: @{update.message.chat.username}"
         await context.bot.send_message(chat_id=OWNER_ID, text=msg)
         if update.message:
-            await update.message.reply_text(GREETING_MESSAGE, reply_markup=reply_markup)
+            await update.message.reply_photo(
+                photo=BytesIO(GREETING_PHOTO),
+                caption=GREETING_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
             logger.warning(msg)
 
     async def handle_inline_choice(
@@ -117,6 +125,19 @@ class BotHandler:
 
         match user_choice:
             case ExamType.EGE:
+                # asyncio.create_task(
+                #     self.send_delayed_photo(
+                #         message=message,
+                #         text=EGE_MESSAGE_1,
+                #         photo=BytesIO(GREETING_PHOTO),
+                #         delay=DELAY_MSG_0,
+                #         username=username,
+                #         button=Button(
+                #             text=TEXT_EGE_BTN_1,
+                #             url=URL_EGE_BTN_1,
+                #         ),
+                #     )
+                # )
                 asyncio.create_task(
                     self.send_delayed_message(
                         message=message,
@@ -219,9 +240,36 @@ class BotHandler:
         reply_markup = None
         if button:
             reply_markup = Button.create_markup([[button]])
-        await message.reply_text(text, reply_markup=reply_markup)
+        await message.reply_text(
+            text=text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
+        )
         logger.warning(
             "Message delivered to user: %s after %d min", username, delay // 60
+        )
+
+    async def send_delayed_photo(
+        self,
+        message: Message,
+        text: str,
+        photo: BytesIO,
+        delay: int,
+        username: str,
+        button: Button | None = None,
+    ):
+        await asyncio.sleep(delay)
+        reply_markup = None
+        if button:
+            reply_markup = Button.create_markup([[button]])
+        await message.reply_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
+        logger.warning(
+            "Photo with text delivered to user: %s after %d min",
+            username,
+            delay // 60,
         )
 
     async def run(self):

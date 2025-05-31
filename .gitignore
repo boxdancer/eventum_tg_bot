@@ -5,3 +5,4 @@ build
 instaloader_bot.egg-info
 *.idea
 *.egg-info
+*.png

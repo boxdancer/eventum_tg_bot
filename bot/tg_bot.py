@@ -282,10 +282,18 @@ class BotHandler:
         await self.bot.set_my_commands(
             [
                 BotCommand(command="start", description="Начать заново"),
+                BotCommand(command="plan_oge", description="План ОГЭ"),
+                BotCommand(command="plan_ege", description="План ЕГЭ"),
+                BotCommand(command="test_oge", description="Тест ОГЭ"),
+                BotCommand(command="test_ege", description="Тест ЕГЭ"),
             ]
         )
 
         self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(CommandHandler("plan_oge", self.plan_oge))
+        self.application.add_handler(CommandHandler("plan_ege", self.plan_ege))
+        self.application.add_handler(CommandHandler("test_oge", self.test_oge))
+        self.application.add_handler(CommandHandler("test_ege", self.test_ege))
         self.application.add_handler(CallbackQueryHandler(self.handle_inline_choice))
 
         await self.application.initialize()
@@ -294,6 +302,19 @@ class BotHandler:
 
         logger.warning("🟢 Telegram bot started...")
         await asyncio.Event().wait()
+
+    async def plan_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(OGE_MESSAGE_3, parse_mode=ParseMode.MARKDOWN_V2)
+
+    async def plan_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(EGE_MESSAGE_3, parse_mode=ParseMode.MARKDOWN_V2)
+
+    async def test_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(OGE_MESSAGE_4, parse_mode=ParseMode.MARKDOWN_V2)
+
+    async def test_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(EGE_MESSAGE_4, parse_mode=ParseMode.MARKDOWN_V2)
+
 
 
 if __name__ == "__main__":

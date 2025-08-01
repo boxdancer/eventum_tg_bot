@@ -1,51 +1,61 @@
-# Project Setup Instructions
+# 🤖 Telegram Bot – Setup & Run Instructions
 
-To run this project, follow the steps below:
-
----
-
-## 📦 1. Install Dependencies
-
-Install the required libraries from `pyproject.toml`:
-
-```bash
-pip install -r requirements.txt  # or use poetry/uv if that's your tool
-```
-
-> Make sure you have Python and pip (or poetry/uv) properly installed.
+This repository contains a Telegram bot powered by Python 3.11 and managed with [uv](https://github.com/astral-sh/uv). You can run it locally or inside Docker.
 
 ---
 
-## 🔐 2. Create a `.env` File
+## 🔐 1. Environment Setup
 
-In the root of the repository, create a `.env` file with the following content:
+Create a `.env` file in the project root with your Telegram bot token:
 
 ```env
-INSTA_USERNAME=your_instagram_username
-INSTA_PASSWORD=your_instagram_password
-INSTA_POST_SHORTCODE=C0d3ABC1  # example shortcode
-
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_BOT_LINK=https://t.me/your_bot_username
 ```
 
-> Replace placeholders with your actual credentials and details.
+---
+
+## 🚀 2. Run Locally (via `uv`)
+
+Make sure you have [`uv`](https://github.com/astral-sh/uv) installed:
+
+```bash
+uv sync
+uv run python bot/tg_bot.py
+```
 
 ---
 
-## ✅ You're Ready!
+## 🐳 3. Run with Docker (Recommended)
 
-After these steps, the project should be ready to run locally by:
+Make sure Docker and Docker Compose are installed, then run:
+
 ```bash
-python run.py
+docker compose up -d --build
 ```
-If you want to run bots in docker container, run in project root directory:
+
+This will:
+
+- Build the Docker image
+- Start the bot container named `tg-bot`
+- Load environment variables from `.env`
+
+To view logs:
+
 ```bash
-docker-compose up
+docker compose logs -f
 ```
+
+To stop the bot:
+
+```bash
+docker compose down
+```
+
 ---
 
-### 🛠️ Notes
+## 📝 Notes
 
-- The `INSTA_POST_SHORTCODE` refers to the unique code at the end of an Instagram post URL.
-- Use a virtual environment for best practices.
+- All static resources (like images) are located in `constants/static`.
+- The main entry point is `bot/tg_bot.py`.
+- Use `.env` to configure runtime secrets and tokens.

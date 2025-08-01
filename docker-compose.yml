@@ -1,19 +1,9 @@
 services:
-  tg_bot:
-    build: ./tg_bot
-    command: python3 tg_bot.py
-    working_dir: /app
-    env_file: .env  # Указываем .env в текущей директории
-    volumes:
-      - ./tg_bot:/app
-      - ./constants:/app/constants
-    restart: unless-stopped
-
-  insta_bot:
-    build: ./insta_bot
-    command: python3 insta_bot.py
-    working_dir: /app
-    env_file: .env  # Указываем .env в текущей директории
-    volumes:
-      - ./insta_bot:/app
-    restart: unless-stopped
+  tg-bot:
+    build:
+      context: .
+    container_name: tg-bot
+    restart: always
+    env_file:
+      - .env
+    command: uv run python -m bot.tg_bot

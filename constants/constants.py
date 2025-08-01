@@ -17,10 +17,12 @@ DELAY_MSG_80 = 80 * 60 * 1
 # Absolute path for dir /constants/static
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
+
 def __prepare_photo_data(file_name: str):
     file_path = os.path.join(STATIC_DIR, f"{file_name}.png")
     with open(file_path, "rb") as photo:
         return photo.read()
+
 
 # Photos
 GREETING_PHOTO = __prepare_photo_data("GREETING_PHOTO")

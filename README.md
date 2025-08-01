@@ -11,6 +11,7 @@ Create a `.env` file in the project root with your Telegram bot token:
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_BOT_LINK=https://t.me/your_bot_username
+OWNER_ID=111111111  # Bot sends notifications to owner
 ```
 
 ---

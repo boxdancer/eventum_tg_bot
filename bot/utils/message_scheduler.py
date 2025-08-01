@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from io import BytesIO
 from telegram import Message
 from telegram.constants import ParseMode
 
 from bot.utils.button import Button
+from logger_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MessageScheduler:

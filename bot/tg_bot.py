@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 from io import BytesIO
 
@@ -31,12 +30,9 @@ from constants.constants import (
     OGE_MESSAGE_4,
     GREETING_PHOTO,
 )
+from logger_config import get_logger
 
-# Logger setup
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Loading envs
 load_dotenv()
@@ -72,7 +68,7 @@ class BotHandler:
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
-            logger.warning(msg)
+            logger.info(msg)
 
     async def handle_inline_choice(self, update, context):
         await self.exam_flow.handle_choice(update, context)
@@ -92,9 +88,7 @@ class BotHandler:
         await message.reply_text(
             text=text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
         )
-        logger.warning(
-            "Message delivered to user: %s after %d min", username, delay // 60
-        )
+        logger.info("Message delivered to user: %s after %d min", username, delay // 60)
 
     async def send_delayed_photo(
         self,
@@ -115,7 +109,7 @@ class BotHandler:
             reply_markup=reply_markup,
             parse_mode=ParseMode.MARKDOWN_V2,
         )
-        logger.warning(
+        logger.info(
             "Photo with text delivered to user: %s after %d min",
             username,
             delay // 60,
@@ -124,9 +118,7 @@ class BotHandler:
     async def run(self):
         # Skip messages while bot offline
         pending_updates = await self.bot.get_updates()
-        logger.warning(
-            "❗ Messages skipped while bot inactive: %s", len(pending_updates)
-        )
+        logger.info("❗ Messages skipped while bot inactive: %s", len(pending_updates))
 
         await self.bot.set_my_commands(
             [
@@ -149,7 +141,7 @@ class BotHandler:
         await self.application.start()
         await self.application.updater.start_polling(drop_pending_updates=True)
 
-        logger.warning("🟢 Telegram bot started...")
+        logger.info("🟢 Telegram bot started...")
         await asyncio.Event().wait()
 
     async def plan_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -7,3 +7,8 @@ services:
     env_file:
       - .env
     command: uv run python -m bot.tg_bot
+    logging:
+      driver: json-file
+      options:
+        max-size: "15m"
+        max-file: "5"

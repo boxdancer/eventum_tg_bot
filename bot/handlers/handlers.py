@@ -1,4 +1,3 @@
-
 from .base_exam_handler import IExamHandler
 from constants.constants import (
     EGE_MESSAGE_1,

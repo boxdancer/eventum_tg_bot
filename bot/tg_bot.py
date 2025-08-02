@@ -29,6 +29,14 @@ from constants.constants import (
     OGE_MESSAGE_3,
     OGE_MESSAGE_4,
     GREETING_PHOTO,
+    TEXT_EGE_BTN_3,
+    URL_EGE_BTN_3,
+    TEXT_OGE_BTN_4,
+    URL_OGE_BTN_4,
+    TEXT_EGE_BTN_4,
+    URL_EGE_BTN_4,
+    TEXT_OGE_BTN_3,
+    URL_OGE_BTN_3,
 )
 from logger_config import get_logger
 
@@ -145,16 +153,40 @@ class BotHandler:
         await asyncio.Event().wait()
 
     async def plan_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(OGE_MESSAGE_3, parse_mode=ParseMode.MARKDOWN_V2)
+        button = Button(TEXT_OGE_BTN_3, url=URL_OGE_BTN_3)
+        reply_markup = Button.create_markup([[button]])
+        await update.message.reply_text(
+            text=OGE_MESSAGE_3,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
 
     async def plan_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(EGE_MESSAGE_3, parse_mode=ParseMode.MARKDOWN_V2)
+        button = Button(TEXT_EGE_BTN_3, url=URL_EGE_BTN_3)
+        reply_markup = Button.create_markup([[button]])
+        await update.message.reply_text(
+            text=EGE_MESSAGE_3,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
 
     async def test_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(OGE_MESSAGE_4, parse_mode=ParseMode.MARKDOWN_V2)
+        button = Button(TEXT_OGE_BTN_4, url=URL_OGE_BTN_4)
+        reply_markup = Button.create_markup([[button]])
+        await update.message.reply_text(
+            text=OGE_MESSAGE_4,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
 
     async def test_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(EGE_MESSAGE_4, parse_mode=ParseMode.MARKDOWN_V2)
+        button = Button(TEXT_EGE_BTN_4, url=URL_EGE_BTN_4)
+        reply_markup = Button.create_markup([[button]])
+        await update.message.reply_text(
+            text=EGE_MESSAGE_4,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
 
 
 if __name__ == "__main__":

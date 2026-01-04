@@ -125,7 +125,7 @@ _Этот тест — это не проверка знаний ради гал
 __Присылай фото с решением:__ @natashkatse"""
 TEXT_EGE_BTN_4 = "Пройти тест"
 URL_EGE_BTN_4 = (
-    "https://drive.google.com/file/d/1EGWmS-d7UXQ6FHYBcZXOwlCAihM-zWnE/view?usp=sharing"
+    "https://drive.google.com/file/d/1s2ol2mLqPuHfv-R0YywTnY9yHFmwND3p/view?usp=drive_link"
 )
 
 OGE_MESSAGE_1 = """ *Вот обещанный файл по «Шинам», в нём:* 
@@ -178,7 +178,7 @@ _Этот тест — это не проверка знаний ради гал
 __Присылай фото с решением:__ @natashkatse"""
 TEXT_OGE_BTN_4 = "Пройти тест"
 URL_OGE_BTN_4 = (
-    "https://drive.google.com/file/d/1SuAsByMtOoxw0j90UMWqcbr5DW5cCu4b/view?usp=sharing"
+    "https://drive.google.com/file/d/1d131NqQ8XfIW0l4wUDuGmJHog8BWvfpl/view?usp=drive_link"
 )
 
 # Materials: MaterialKey -> Material(message, button_text, url)

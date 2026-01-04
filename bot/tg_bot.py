@@ -52,7 +52,8 @@ class BotHandler:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = [[
             Button(text=ExamType.OGE, callback_data=ExamType.OGE),
-            Button(text=ExamType.EGE, callback_data=ExamType.EGE),
+            Button(text=ExamType.EGE_PROFILE, callback_data=ExamType.EGE_PROFILE),
+            Button(text=ExamType.EGE_BASE, callback_data=ExamType.EGE_BASE),
         ]]
         
         msg = f"/start triggered by user: @{update.message.chat.username}"

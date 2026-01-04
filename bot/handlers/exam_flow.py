@@ -3,7 +3,7 @@ import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from bot.handlers.handlers import EgeHandler, OgeHandler
+from bot.handlers.handlers import EgeProfileHandler, EgeBaseHandler, OgeHandler
 from bot.utils.subscription_checker import is_subscribed, send_subscription_required
 from constants.constants import ExamType, CHECK_SUBSCRIPTION_CHANNEL_USERNAME
 from logger_config import get_logger
@@ -17,7 +17,8 @@ class ExamFlowHandler:
         self.owner_id = owner_id
         self.tasks = []
         self.handlers = {
-            ExamType.EGE: EgeHandler(scheduler, self),
+            ExamType.EGE_PROFILE: EgeProfileHandler(scheduler, self),
+            ExamType.EGE_BASE: EgeBaseHandler(scheduler, self),
             ExamType.OGE: OgeHandler(scheduler, self),
         }
 

@@ -56,7 +56,7 @@ class BotHandler:
         self.bot = Bot(token=self.token)
         self.application: Application = ApplicationBuilder().token(self.token).build()
         self.scheduler = MessageScheduler()
-        self.exam_flow = ExamFlowHandler(self.scheduler)
+        self.exam_flow = ExamFlowHandler(self.scheduler, owner_id=OWNER_ID)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = [

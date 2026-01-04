@@ -1,9 +1,13 @@
-from telegram import Bot, Message
+from functools import wraps
+
+from telegram import Bot, Message, Update
 from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 from bot.utils.button import Button
 from constants.constants import (
     CHECK_SUBSCRIPTION_CHANNEL,
+    CHECK_SUBSCRIPTION_CHANNEL_USERNAME,
     SUBSCRIPTION_REQUIRED_MESSAGE,
 )
 from logger_config import get_logger
@@ -11,6 +15,18 @@ from logger_config import get_logger
 logger = get_logger(__name__)
 
 ALLOWED_STATUSES = {"member", "administrator", "creator"}
+
+
+def requires_subscription(func):
+    """Decorator that checks subscription before executing command handler."""
+    @wraps(func)
+    async def wrapper(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.message.from_user.id
+        if not await is_subscribed(context.bot, user_id, CHECK_SUBSCRIPTION_CHANNEL_USERNAME):
+            await send_subscription_required(update.message)
+            return
+        return await func(self, update, context, *args, **kwargs)
+    return wrapper
 
 
 async def is_subscribed(bot: Bot, user_id: int, channel_username: str) -> bool:

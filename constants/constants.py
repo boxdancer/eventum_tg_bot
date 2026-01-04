@@ -32,6 +32,7 @@ class Command(str, enum.Enum):
     TEST_OGE = "test_oge"
     TEST_EGE_PROFILE = "test_ege_profile"
     TEST_EGE_BASE = "test_ege_base"
+    FREE_VIDEOLESSON = "free_videolesson"
 
 
 # Command descriptions for bot menu
@@ -43,6 +44,7 @@ COMMAND_DESCRIPTIONS = {
     Command.TEST_OGE: "Тест ОГЭ",
     Command.TEST_EGE_PROFILE: "Тест ЕГЭ профиль",
     Command.TEST_EGE_BASE: "Тест ЕГЭ база",
+    Command.FREE_VIDEOLESSON: "Бесплатный видеоурок",
 }
 
 
@@ -57,6 +59,7 @@ DELAY_MSG_0 = 0
 DELAY_MSG_20 = 20 * 60 * 1
 DELAY_MSG_50 = 50 * 60 * 1
 DELAY_MSG_80 = 80 * 60 * 1
+DELAY_MSG_90 = 90 * 60 * 1
 
 
 # Absolute path for dir /constants/static
@@ -236,6 +239,13 @@ TEXT_OGE_BTN_4 = "Пройти тест"
 URL_OGE_BTN_4 = (
     "https://drive.google.com/file/d/1d131NqQ8XfIW0l4wUDuGmJHog8BWvfpl/view?usp=drive_link"
 )
+
+# Free videolesson message (no button, text only)
+FREE_VIDEOLESSON_MESSAGE = """У меня есть для тебя бесплатный видеоурок, который поможет разобраться с одной важной темой по математике и убрать пробелы, из\-за которых чаще всего возникают ошибки\.
+
+Этот урок я отдаю лично, чтобы понимать, кому он действительно нужен\.
+
+Напиши мне в личные сообщения @natashkatse слово *УРОК* — вышлю доступ 🎯"""
 
 # Materials: MaterialKey -> Material(message, button_text, url)
 MATERIALS = {

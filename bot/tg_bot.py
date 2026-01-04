@@ -18,17 +18,17 @@ from bot.handlers.exam_flow import ExamFlowHandler
 from bot.handlers.material_handler import handle_material_callback
 from bot.utils.button import Button
 from bot.utils.message_scheduler import MessageScheduler
-from bot.utils.subscription_checker import is_subscribed, send_subscription_required
+from bot.utils.subscription_checker import requires_subscription
 from constants.constants import (
     GREETING_MESSAGE,
     GREETING_PHOTO,
     ExamType,
-    CHECK_SUBSCRIPTION_CHANNEL_USERNAME,
     MATERIALS,
     COMMAND_MATERIALS,
     COMMAND_DESCRIPTIONS,
     MaterialKey,
     Command,
+    FREE_VIDEOLESSON_MESSAGE,
 )
 from logger_config import get_logger
 
@@ -67,18 +67,23 @@ class BotHandler:
         )
         logger.info(msg)
 
+    @requires_subscription
     async def handle_material_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, material_key: MaterialKey
     ):
-        """Generic handler for material commands with subscription check."""
-        if not await is_subscribed(context.bot, update.message.from_user.id, CHECK_SUBSCRIPTION_CHANNEL_USERNAME):
-            await send_subscription_required(update.message)
-            return
-
+        """Generic handler for material commands."""
         material = MATERIALS[material_key]
         await update.message.reply_text(
             text=material.message,
             reply_markup=Button.create_markup([[Button(material.button_text, url=material.url)]]),
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
+
+    @requires_subscription
+    async def free_videolesson(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handler for /free_videolesson command."""
+        await update.message.reply_text(
+            text=FREE_VIDEOLESSON_MESSAGE,
             parse_mode=ParseMode.MARKDOWN_V2,
         )
 
@@ -92,6 +97,7 @@ class BotHandler:
         ])
 
         self.application.add_handler(CommandHandler(Command.START, self.start))
+        self.application.add_handler(CommandHandler(Command.FREE_VIDEOLESSON, self.free_videolesson))
         
         # Register material commands dynamically
         for cmd, material_key in COMMAND_MATERIALS.items():

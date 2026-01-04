@@ -1,10 +1,44 @@
 import enum
 import os
+from typing import NamedTuple
 
 
 class ExamType(str, enum.Enum):
     OGE = "ОГЭ"
     EGE = "ЕГЭ"
+
+
+class MaterialKey(str, enum.Enum):
+    EGE_1 = "ege_1"
+    EGE_3 = "ege_3"
+    EGE_4 = "ege_4"
+    OGE_1 = "oge_1"
+    OGE_3 = "oge_3"
+    OGE_4 = "oge_4"
+
+
+class Command(str, enum.Enum):
+    START = "start"
+    PLAN_OGE = "plan_oge"
+    PLAN_EGE = "plan_ege"
+    TEST_OGE = "test_oge"
+    TEST_EGE = "test_ege"
+
+
+# Command descriptions for bot menu
+COMMAND_DESCRIPTIONS = {
+    Command.START: "Начать заново",
+    Command.PLAN_OGE: "План ОГЭ",
+    Command.PLAN_EGE: "План ЕГЭ",
+    Command.TEST_OGE: "Тест ОГЭ",
+    Command.TEST_EGE: "Тест ЕГЭ",
+}
+
+
+class Material(NamedTuple):
+    message: str
+    button_text: str
+    url: str
 
 
 # Message Delay Constants Minutes
@@ -23,6 +57,15 @@ def __prepare_photo_data(file_name: str):
     with open(file_path, "rb") as photo:
         return photo.read()
 
+
+# Subscription channel
+CHECK_SUBSCRIPTION_CHANNEL = "https://t.me/celina_math"
+CHECK_SUBSCRIPTION_CHANNEL_USERNAME = CHECK_SUBSCRIPTION_CHANNEL.split("/")[-1]
+SUBSCRIPTION_REQUIRED_MESSAGE = (
+    "🔒 *Для доступа к материалам необходимо подписаться на наш канал\!*\n\n"
+    "Подпишись на канал \@celina\_math, чтобы получить доступ ко всем материалам\.\n\n"
+    "После подписки нажми на кнопку снова\."
+)
 
 # Photos
 GREETING_PHOTO = __prepare_photo_data("GREETING_PHOTO")
@@ -137,3 +180,21 @@ TEXT_OGE_BTN_4 = "Пройти тест"
 URL_OGE_BTN_4 = (
     "https://drive.google.com/file/d/1SuAsByMtOoxw0j90UMWqcbr5DW5cCu4b/view?usp=sharing"
 )
+
+# Materials: MaterialKey -> Material(message, button_text, url)
+MATERIALS = {
+    MaterialKey.EGE_1: Material(EGE_MESSAGE_1, TEXT_EGE_BTN_1, URL_EGE_BTN_1),
+    MaterialKey.EGE_3: Material(EGE_MESSAGE_3, TEXT_EGE_BTN_3, URL_EGE_BTN_3),
+    MaterialKey.EGE_4: Material(EGE_MESSAGE_4, TEXT_EGE_BTN_4, URL_EGE_BTN_4),
+    MaterialKey.OGE_1: Material(OGE_MESSAGE_1, TEXT_OGE_BTN_1, URL_OGE_BTN_1),
+    MaterialKey.OGE_3: Material(OGE_MESSAGE_3, TEXT_OGE_BTN_3, URL_OGE_BTN_3),
+    MaterialKey.OGE_4: Material(OGE_MESSAGE_4, TEXT_OGE_BTN_4, URL_OGE_BTN_4),
+}
+
+# Command -> MaterialKey
+COMMAND_MATERIALS = {
+    Command.PLAN_OGE: MaterialKey.OGE_3,
+    Command.PLAN_EGE: MaterialKey.EGE_3,
+    Command.TEST_OGE: MaterialKey.OGE_4,
+    Command.TEST_EGE: MaterialKey.EGE_4,
+}

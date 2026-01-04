@@ -1,14 +1,10 @@
 import asyncio
 import os
 from io import BytesIO
+from functools import partial
 
 from dotenv import load_dotenv
-from telegram import (
-    Update,
-    Bot,
-    BotCommand,
-    Message,
-)
+from telegram import Update, Bot, BotCommand
 from telegram.constants import ParseMode
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,30 +15,25 @@ from telegram.ext import (
 )
 
 from bot.handlers.exam_flow import ExamFlowHandler
+from bot.handlers.material_handler import handle_material_callback
 from bot.utils.button import Button
 from bot.utils.message_scheduler import MessageScheduler
+from bot.utils.subscription_checker import is_subscribed, send_subscription_required
 from constants.constants import (
     GREETING_MESSAGE,
-    EGE_MESSAGE_3,
-    EGE_MESSAGE_4,
-    ExamType,
-    OGE_MESSAGE_3,
-    OGE_MESSAGE_4,
     GREETING_PHOTO,
-    TEXT_EGE_BTN_3,
-    URL_EGE_BTN_3,
-    TEXT_OGE_BTN_4,
-    URL_OGE_BTN_4,
-    TEXT_EGE_BTN_4,
-    URL_EGE_BTN_4,
-    TEXT_OGE_BTN_3,
-    URL_OGE_BTN_3,
+    ExamType,
+    CHECK_SUBSCRIPTION_CHANNEL_USERNAME,
+    MATERIALS,
+    COMMAND_MATERIALS,
+    COMMAND_DESCRIPTIONS,
+    MaterialKey,
+    Command,
 )
 from logger_config import get_logger
 
 logger = get_logger(__name__)
 
-# Loading envs
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OWNER_ID = os.getenv("OWNER_ID")
@@ -59,91 +50,57 @@ class BotHandler:
         self.exam_flow = ExamFlowHandler(self.scheduler, owner_id=OWNER_ID)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        buttons = [
-            [
-                Button(text=ExamType.OGE, callback_data=ExamType.OGE),
-                Button(text=ExamType.EGE, callback_data=ExamType.EGE),
-            ]
-        ]
-        reply_markup = Button.create_markup(buttons)
-        # Direct message to the bot owner about potential customer
+        buttons = [[
+            Button(text=ExamType.OGE, callback_data=ExamType.OGE),
+            Button(text=ExamType.EGE, callback_data=ExamType.EGE),
+        ]]
+        
         msg = f"/start triggered by user: @{update.message.chat.username}"
         await context.bot.send_message(chat_id=OWNER_ID, text=msg)
-        if update.message:
-            await update.message.reply_photo(
-                photo=BytesIO(GREETING_PHOTO),
-                caption=GREETING_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
-            logger.info(msg)
-
-    async def handle_inline_choice(self, update, context):
-        await self.exam_flow.handle_choice(update, context)
-
-    async def send_delayed_message(
-        self,
-        message: Message,
-        text: str,
-        delay: int,
-        username: str,
-        button: Button | None = None,
-    ):
-        await asyncio.sleep(delay)
-        reply_markup = None
-        if button:
-            reply_markup = Button.create_markup([[button]])
-        await message.reply_text(
-            text=text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
-        )
-        logger.info("Message delivered to user: %s after %d min", username, delay // 60)
-
-    async def send_delayed_photo(
-        self,
-        message: Message,
-        text: str,
-        photo: BytesIO,
-        delay: int,
-        username: str,
-        button: Button | None = None,
-    ):
-        await asyncio.sleep(delay)
-        reply_markup = None
-        if button:
-            reply_markup = Button.create_markup([[button]])
-        await message.reply_photo(
-            photo=photo,
-            caption=text,
-            reply_markup=reply_markup,
+        
+        await update.message.reply_photo(
+            photo=BytesIO(GREETING_PHOTO),
+            caption=GREETING_MESSAGE,
+            reply_markup=Button.create_markup(buttons),
             parse_mode=ParseMode.MARKDOWN_V2,
         )
-        logger.info(
-            "Photo with text delivered to user: %s after %d min",
-            username,
-            delay // 60,
+        logger.info(msg)
+
+    async def handle_material_command(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE, material_key: MaterialKey
+    ):
+        """Generic handler for material commands with subscription check."""
+        if not await is_subscribed(context.bot, update.message.from_user.id, CHECK_SUBSCRIPTION_CHANNEL_USERNAME):
+            await send_subscription_required(update.message)
+            return
+
+        material = MATERIALS[material_key]
+        await update.message.reply_text(
+            text=material.message,
+            reply_markup=Button.create_markup([[Button(material.button_text, url=material.url)]]),
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
 
     async def run(self):
-        # Skip messages while bot offline
         pending_updates = await self.bot.get_updates()
         logger.info("❗ Messages skipped while bot inactive: %s", len(pending_updates))
 
-        await self.bot.set_my_commands(
-            [
-                BotCommand(command="start", description="Начать заново"),
-                BotCommand(command="plan_oge", description="План ОГЭ"),
-                BotCommand(command="plan_ege", description="План ЕГЭ"),
-                BotCommand(command="test_oge", description="Тест ОГЭ"),
-                BotCommand(command="test_ege", description="Тест ЕГЭ"),
-            ]
-        )
+        await self.bot.set_my_commands([
+            BotCommand(command=cmd, description=desc)
+            for cmd, desc in COMMAND_DESCRIPTIONS.items()
+        ])
 
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("plan_oge", self.plan_oge))
-        self.application.add_handler(CommandHandler("plan_ege", self.plan_ege))
-        self.application.add_handler(CommandHandler("test_oge", self.test_oge))
-        self.application.add_handler(CommandHandler("test_ege", self.test_ege))
-        self.application.add_handler(CallbackQueryHandler(self.handle_inline_choice))
+        self.application.add_handler(CommandHandler(Command.START, self.start))
+        
+        # Register material commands dynamically
+        for cmd, material_key in COMMAND_MATERIALS.items():
+            handler = partial(self.handle_material_command, material_key=material_key)
+            self.application.add_handler(CommandHandler(cmd, handler))
+
+        self.application.add_handler(CallbackQueryHandler(self.exam_flow.handle_choice))
+        self.application.add_handler(
+            CallbackQueryHandler(handle_material_callback, pattern="^material:")
+        )
 
         await self.application.initialize()
         await self.application.start()
@@ -151,42 +108,6 @@ class BotHandler:
 
         logger.info("🟢 Telegram bot started...")
         await asyncio.Event().wait()
-
-    async def plan_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        button = Button(TEXT_OGE_BTN_3, url=URL_OGE_BTN_3)
-        reply_markup = Button.create_markup([[button]])
-        await update.message.reply_text(
-            text=OGE_MESSAGE_3,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN_V2,
-        )
-
-    async def plan_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        button = Button(TEXT_EGE_BTN_3, url=URL_EGE_BTN_3)
-        reply_markup = Button.create_markup([[button]])
-        await update.message.reply_text(
-            text=EGE_MESSAGE_3,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN_V2,
-        )
-
-    async def test_oge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        button = Button(TEXT_OGE_BTN_4, url=URL_OGE_BTN_4)
-        reply_markup = Button.create_markup([[button]])
-        await update.message.reply_text(
-            text=OGE_MESSAGE_4,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN_V2,
-        )
-
-    async def test_ege(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        button = Button(TEXT_EGE_BTN_4, url=URL_EGE_BTN_4)
-        reply_markup = Button.create_markup([[button]])
-        await update.message.reply_text(
-            text=EGE_MESSAGE_4,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN_V2,
-        )
 
 
 if __name__ == "__main__":

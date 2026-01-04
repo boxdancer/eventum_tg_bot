@@ -4,9 +4,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.handlers import EgeHandler, OgeHandler
-from constants.constants import (
-    ExamType,
-)
+from bot.utils.subscription_checker import is_subscribed, send_subscription_required
+from constants.constants import ExamType, CHECK_SUBSCRIPTION_CHANNEL_USERNAME
 from logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -31,14 +30,19 @@ class ExamFlowHandler:
         if not query:
             return
         await query.answer()
-        user_choice = query.data
-        username = query.from_user.name
-        message = query.message
 
-        msg = f"{username} chose: {user_choice}"
-        await context.bot.send_message(chat_id=self.owner_id, text=msg)
-        logger.info(msg)
+        user_id = query.from_user.id
+        user_choice = query.data
+
+        if not await is_subscribed(context.bot, user_id, CHECK_SUBSCRIPTION_CHANNEL_USERNAME):
+            await send_subscription_required(query.message)
+            return
+
+        await context.bot.send_message(
+            chat_id=self.owner_id,
+            text=f"{query.from_user.name} chose: {user_choice}",
+        )
 
         handler = self.handlers.get(user_choice)
         if handler:
-            await handler.handle(message, username)
+            await handler.handle(query.message, query.from_user.name)

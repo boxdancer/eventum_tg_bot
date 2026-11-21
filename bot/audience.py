@@ -2,13 +2,14 @@ from datetime import datetime
 
 from constants.audience import AudienceCategory
 from logger_config import get_logger
-from sqlalchemy import func, select, update
+from sqlalchemy import Text, func, literal, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.sql import ColumnElement
 from telegram import User
 
-from bot.db.models import UserModel
+from bot.db.models import UserCategoryModel, UserModel
 from bot.db.session import database_url
 
 logger = get_logger(__name__)
@@ -49,9 +50,18 @@ class Audience:
         )
         await self._write(stmt, user.id)
 
-    async def set_category(self, telegram_id: int, category: AudienceCategory):
+    async def add_category(self, telegram_id: int, category: AudienceCategory):
+        user_selection = select(UserModel.telegram_id, literal(category, type_=Text())).where(
+            UserModel.telegram_id == telegram_id
+        )
         stmt = (
-            update(UserModel).where(UserModel.telegram_id == telegram_id).values(category=category)
+            insert(UserCategoryModel)
+            .from_select(
+                [UserCategoryModel.telegram_id, UserCategoryModel.category], user_selection
+            )
+            .on_conflict_do_nothing(
+                index_elements=[UserCategoryModel.telegram_id, UserCategoryModel.category]
+            )
         )
         await self._write(stmt, telegram_id)
 
@@ -64,9 +74,13 @@ class Audience:
 
     @staticmethod
     def _segment(category: AudienceCategory | None, since: datetime | None):
-        conditions = []
+        conditions: list[ColumnElement[bool]] = []
         if category is not None:
-            conditions.append(UserModel.category == category)
+            membership = select(UserCategoryModel.telegram_id).where(
+                UserCategoryModel.telegram_id == UserModel.telegram_id,
+                UserCategoryModel.category == category,
+            )
+            conditions.append(membership.exists())
         if since is not None:
             conditions.append(UserModel.created_at >= since)
         return conditions

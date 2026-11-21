@@ -55,7 +55,7 @@ class ExamFlowHandler:
             return
 
         handler, category = flow
-        await self.audience.set_category(user_id, category)
+        await self.audience.add_category(user_id, category)
 
         await context.bot.send_message(
             chat_id=self.owner_id,

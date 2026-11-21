@@ -41,7 +41,7 @@ class BroadcastDraft:
     token: str
     category: AudienceCategory | None
     since: datetime | None
-    text: str | None = None
+    preview_message_id: int | None = None
 
 
 class AdminHandler:
@@ -101,11 +101,11 @@ class AdminHandler:
             draft = user_data.get(BROADCAST_DRAFT_KEY)
             if draft is None or draft.token != parts[0]:
                 return
-            if action == AdminAction.SEND and draft.text is not None:
+            if action == AdminAction.SEND and draft.preview_message_id == query.message.message_id:
                 await self.confirm(query, context, draft)
             elif action == AdminAction.CANCEL:
                 user_data.pop(BROADCAST_DRAFT_KEY)
-                await query.edit_message_text(AdminText.CANCELLED, reply_markup=self.menu())
+                await self.finish_draft(query, AdminText.CANCELLED)
 
     async def choose_segment(self, query, context, action: AdminAction, parts: list[str]):
         back = [admin_button(AdminText.MENU, AdminAction.MENU)]
@@ -152,7 +152,7 @@ class AdminHandler:
             draft = BroadcastDraft(uuid4().hex, category, since)
             context.user_data[BROADCAST_DRAFT_KEY] = draft
             await query.edit_message_text(
-                AdminText.ENTER_TEXT.format(count=count),
+                AdminText.ENTER_MESSAGE.format(count=count),
                 reply_markup=Button.create_markup(
                     [[admin_button(AdminText.CANCEL, AdminAction.CANCEL, draft.token)]]
                 ),
@@ -199,31 +199,46 @@ class AdminHandler:
         buttons.append([admin_button(AdminText.MENU, AdminAction.MENU)])
         await query.edit_message_text("\n".join(lines), reply_markup=Button.create_markup(buttons))
 
-    async def receive_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def receive_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.effective_message
         user_data = context.user_data
         if not self.allowed(update) or message is None or user_data is None:
             return
         draft = user_data.get(BROADCAST_DRAFT_KEY)
-        text = message.text
-        if draft is None or draft.text is not None or not text or not text.strip():
+        if draft is None or draft.preview_message_id is not None:
             return
-        await message.reply_text(
-            text,
-            reply_markup=Button.create_markup(
+        if message.media_group_id:
+            await message.reply_text(AdminText.SEND_ONE_MESSAGE)
+            return
+
+        keyboard = Button.create_markup(
+            [
                 [
-                    [
-                        admin_button(AdminText.CONFIRM, AdminAction.SEND, draft.token),
-                        admin_button(AdminText.CANCEL, AdminAction.CANCEL, draft.token),
-                    ]
+                    admin_button(AdminText.CONFIRM, AdminAction.SEND, draft.token),
+                    admin_button(AdminText.CANCEL, AdminAction.CANCEL, draft.token),
                 ]
-            ),
+            ]
         )
-        draft.text = text
+        try:
+            preview = await context.bot.copy_message(
+                chat_id=message.chat_id,
+                from_chat_id=message.chat_id,
+                message_id=message.message_id,
+                reply_markup=keyboard,
+            )
+        except TelegramError as error:
+            logger.warning("Broadcast preview failed: %s", type(error).__name__)
+            await message.reply_text(AdminText.PREVIEW_FAILED)
+            return
+        draft.preview_message_id = preview.message_id
+
+    async def finish_draft(self, query, text: str):
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(text, reply_markup=self.menu())
 
     async def confirm(self, query, context, draft: BroadcastDraft):
-        text = draft.text
-        if text is None:
+        preview_message_id = draft.preview_message_id
+        if preview_message_id is None:
             return
         if self.broadcast_task and not self.broadcast_task.done():
             await query.message.reply_text(AdminText.BUSY)
@@ -232,16 +247,17 @@ class AdminHandler:
         recipients = await self.audience.recipient_ids(draft.category, draft.since)
         context.user_data.pop(BROADCAST_DRAFT_KEY)
         if not recipients:
-            await query.edit_message_text(AdminText.NO_RECIPIENTS, reply_markup=self.menu())
+            await self.finish_draft(query, AdminText.NO_RECIPIENTS)
             return
 
-        self.broadcast_task = asyncio.create_task(self.broadcast(context.bot, recipients, text))
-        await query.edit_message_text(
-            AdminText.STARTED.format(count=len(recipients)),
-            reply_markup=self.menu(),
+        self.broadcast_task = asyncio.create_task(
+            self.broadcast(context.bot, recipients, query.message.chat_id, preview_message_id)
         )
+        await self.finish_draft(query, AdminText.STARTED.format(count=len(recipients)))
 
-    async def broadcast(self, bot: Bot, recipients: list[int], text: str):
+    async def broadcast(
+        self, bot: Bot, recipients: list[int], source_chat_id: int, message_id: int
+    ):
         sent = 0
         logger.info("Broadcast started: recipients=%s", len(recipients))
         for index, telegram_id in enumerate(recipients):
@@ -249,7 +265,11 @@ class AdminHandler:
                 await asyncio.sleep(BROADCAST_DELAY_SECONDS)
             while True:
                 try:
-                    await bot.send_message(chat_id=telegram_id, text=text)
+                    await bot.copy_message(
+                        chat_id=telegram_id,
+                        from_chat_id=source_chat_id,
+                        message_id=message_id,
+                    )
                     sent += 1
                     break
                 except RetryAfter as error:

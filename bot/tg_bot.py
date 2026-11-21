@@ -157,8 +157,19 @@ class BotHandler:
         )
         self.application.add_handler(
             MessageHandler(
-                filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND,
-                self.admin.receive_text,
+                filters.ChatType.PRIVATE
+                & ~filters.COMMAND
+                & (
+                    filters.TEXT
+                    | filters.PHOTO
+                    | filters.Document.ALL
+                    | filters.VIDEO
+                    | filters.ANIMATION
+                    | filters.AUDIO
+                    | filters.VOICE
+                    | filters.VIDEO_NOTE
+                ),
+                self.admin.receive_message,
             )
         )
         self.application.run_polling(drop_pending_updates=True)

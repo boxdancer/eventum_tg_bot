@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 from constants.audience import AudienceCategory
-from constants.constants import Command
+from constants.constants import Command, ExamType
 
 CALLBACK_SEPARATOR = ":"
 ADMIN_CALLBACK_PREFIX = f"{Command.ADMIN.value}{CALLBACK_SEPARATOR}"
@@ -30,8 +30,9 @@ class AudiencePeriod(StrEnum):
 ALL_CATEGORIES = "all"
 CATEGORY_LABELS = {
     ALL_CATEGORIES: "Все",
-    AudienceCategory.OGE: "ОГЭ",
-    AudienceCategory.EGE: "ЕГЭ",
+    AudienceCategory.OGE: ExamType.OGE.value,
+    AudienceCategory.EGE: ExamType.EGE_PROFILE.value,
+    AudienceCategory.EGE_BASE: ExamType.EGE_BASE.value,
 }
 PERIOD_LABELS = {
     AudiencePeriod.ALL: "Всё время",

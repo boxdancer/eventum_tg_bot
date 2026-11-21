@@ -21,7 +21,7 @@ class ExamFlowHandler:
                 EgeProfileHandler(scheduler, self),
                 AudienceCategory.EGE,
             ),
-            ExamType.EGE_BASE.value: (EgeBaseHandler(scheduler, self), AudienceCategory.EGE),
+            ExamType.EGE_BASE.value: (EgeBaseHandler(scheduler, self), AudienceCategory.EGE_BASE),
             ExamType.OGE.value: (OgeHandler(scheduler, self), AudienceCategory.OGE),
         }
 

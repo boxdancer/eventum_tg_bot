@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from logger_config import get_logger
 from telegram import BotCommand, Update
 from telegram.constants import ChatType, ParseMode
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -39,6 +40,7 @@ from bot.utils.message_scheduler import MessageScheduler
 from bot.utils.subscription_checker import requires_subscription, subscription_channel
 
 logger = get_logger(__name__)
+PENDING_UPDATES_LIMIT = 100
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -126,6 +128,20 @@ class BotHandler:
                 for cmd, desc in COMMAND_DESCRIPTIONS.items()
             ]
         )
+
+        try:
+            pending = await application.bot.get_updates(limit=PENDING_UPDATES_LIMIT, timeout=0)
+        except TelegramError as error:
+            logger.warning(
+                "Could not count pending updates before polling: %s",
+                type(error).__name__,
+            )
+        else:
+            count = str(len(pending))
+            if len(pending) == PENDING_UPDATES_LIMIT:
+                count += "+"
+            logger.info("Pending updates to discard at startup: %s", count)
+        logger.info("Telegram bot initialized. Starting polling.")
 
     async def post_stop(self, application: Application):
         await self.admin.stop()

@@ -1,13 +1,13 @@
 import asyncio
 
-from telegram import Update
+from constants.audience import AudienceCategory
+from constants.constants import ExamType
+from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from bot.audience import Audience
-from bot.handlers.handlers import EgeProfileHandler, EgeBaseHandler, OgeHandler
+from bot.handlers.handlers import EgeBaseHandler, EgeProfileHandler, OgeHandler
 from bot.utils.subscription_checker import is_subscribed, send_subscription_required
-from constants.audience import AudienceCategory
-from constants.constants import ExamType
 
 
 class ExamFlowHandler:
@@ -15,14 +15,14 @@ class ExamFlowHandler:
         self.scheduler = scheduler
         self.owner_id = owner_id
         self.audience = audience
-        self.tasks = set()
+        self.tasks: set[asyncio.Task[None]] = set()
         self.handlers = {
-            ExamType.EGE_PROFILE: (
+            ExamType.EGE_PROFILE.value: (
                 EgeProfileHandler(scheduler, self),
                 AudienceCategory.EGE,
             ),
-            ExamType.EGE_BASE: (EgeBaseHandler(scheduler, self), AudienceCategory.EGE),
-            ExamType.OGE: (OgeHandler(scheduler, self), AudienceCategory.OGE),
+            ExamType.EGE_BASE.value: (EgeBaseHandler(scheduler, self), AudienceCategory.EGE),
+            ExamType.OGE.value: (OgeHandler(scheduler, self), AudienceCategory.OGE),
         }
 
     def track_task(self, coro):
@@ -40,15 +40,18 @@ class ExamFlowHandler:
         query = update.callback_query
         if not query:
             return
+        await query.answer()
+        message = query.message
         user_choice = query.data
+        if not isinstance(message, Message) or user_choice is None:
+            return
         flow = self.handlers.get(user_choice)
         if flow is None:
             return
-        await query.answer()
         user_id = query.from_user.id
 
         if not await is_subscribed(context.bot, user_id):
-            await send_subscription_required(query.message)
+            await send_subscription_required(message)
             return
 
         handler, category = flow
@@ -59,4 +62,4 @@ class ExamFlowHandler:
             text=f"{query.from_user.name} chose: {user_choice}",
         )
 
-        await handler.handle(query.message, query.from_user.name)
+        await handler.handle(message, query.from_user.name)

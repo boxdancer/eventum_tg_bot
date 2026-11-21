@@ -1,10 +1,11 @@
 import asyncio
 from io import BytesIO
+
+from logger_config import get_logger
 from telegram import Message
 from telegram.constants import ParseMode
 
 from bot.utils.button import Button
-from logger_config import get_logger
 
 logger = get_logger(__name__)
 

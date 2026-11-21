@@ -1,15 +1,8 @@
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from telegram import Bot, Update
-from telegram.constants import ChatType
-from telegram.error import RetryAfter, TelegramError
-from telegram.ext import ContextTypes
-
-from bot.audience import Audience
-from bot.utils.button import Button
 from constants.admin import (
     ADMIN_CALLBACK_PREFIX,
     ALL_CATEGORIES,
@@ -27,6 +20,13 @@ from constants.admin import (
 )
 from constants.audience import AudienceCategory
 from logger_config import get_logger
+from telegram import Bot, Message, Update
+from telegram.constants import ChatType
+from telegram.error import RetryAfter, TelegramError
+from telegram.ext import ContextTypes
+
+from bot.audience import Audience
+from bot.utils.button import Button
 
 logger = get_logger(__name__)
 
@@ -53,9 +53,7 @@ class AdminHandler:
     def allowed(self, update: Update) -> bool:
         chat = update.effective_chat
         user = update.effective_user
-        return bool(
-            chat and chat.type == ChatType.PRIVATE and user and user.id == self.owner_id
-        )
+        return bool(chat and chat.type == ChatType.PRIVATE and user and user.id == self.owner_id)
 
     @staticmethod
     def menu():
@@ -69,53 +67,50 @@ class AdminHandler:
         )
 
     async def open(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.allowed(update):
-            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
-            await update.effective_message.reply_text(
-                AdminText.TITLE, reply_markup=self.menu()
-            )
+        message = update.effective_message
+        user_data = context.user_data
+        if not self.allowed(update) or message is None or user_data is None:
+            return
+        user_data.pop(BROADCAST_DRAFT_KEY, None)
+        await message.reply_text(AdminText.TITLE, reply_markup=self.menu())
 
     async def callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
+        if query is None:
+            return
         if not self.allowed(update):
             await query.answer(AdminText.DENIED, show_alert=True)
             return
 
         await query.answer()
-        action, *parts = query.data.removeprefix(ADMIN_CALLBACK_PREFIX).split(
-            CALLBACK_SEPARATOR
-        )
+        user_data = context.user_data
+        if user_data is None or query.data is None or not isinstance(query.message, Message):
+            return
+        action, *parts = query.data.removeprefix(ADMIN_CALLBACK_PREFIX).split(CALLBACK_SEPARATOR)
         try:
             action = AdminAction(action)
         except ValueError:
             return
 
         if action == AdminAction.MENU and not parts:
-            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+            user_data.pop(BROADCAST_DRAFT_KEY, None)
             await query.edit_message_text(AdminText.TITLE, reply_markup=self.menu())
         elif action in (AdminAction.USERS, AdminAction.BROADCAST):
             await self.choose_segment(query, context, action, parts)
         elif action in (AdminAction.SEND, AdminAction.CANCEL) and len(parts) == 1:
-            draft = context.user_data.get(BROADCAST_DRAFT_KEY)
+            draft = user_data.get(BROADCAST_DRAFT_KEY)
             if draft is None or draft.token != parts[0]:
                 return
             if action == AdminAction.SEND and draft.text is not None:
                 await self.confirm(query, context, draft)
             elif action == AdminAction.CANCEL:
-                context.user_data.pop(BROADCAST_DRAFT_KEY)
-                await query.edit_message_text(
-                    AdminText.CANCELLED, reply_markup=self.menu()
-                )
+                user_data.pop(BROADCAST_DRAFT_KEY)
+                await query.edit_message_text(AdminText.CANCELLED, reply_markup=self.menu())
 
-    async def choose_segment(
-        self, query, context, action: AdminAction, parts: list[str]
-    ):
+    async def choose_segment(self, query, context, action: AdminAction, parts: list[str]):
         back = [admin_button(AdminText.MENU, AdminAction.MENU)]
         if not parts:
-            buttons = [
-                admin_button(label, action, key)
-                for key, label in CATEGORY_LABELS.items()
-            ]
+            buttons = [admin_button(label, action, key) for key, label in CATEGORY_LABELS.items()]
             context.user_data.pop(BROADCAST_DRAFT_KEY, None)
             await query.edit_message_text(
                 AdminText.CHOOSE_CATEGORY,
@@ -141,22 +136,18 @@ class AdminHandler:
         period = parts[1]
         if period not in PERIOD_LABELS:
             return
-        category = (
-            None if category_key == ALL_CATEGORIES else AudienceCategory(category_key)
-        )
+        category = None if category_key == ALL_CATEGORIES else AudienceCategory(category_key)
         since = (
             None
             if period == AudiencePeriod.ALL
-            else datetime.now(timezone.utc) - timedelta(days=int(period))
+            else datetime.now(UTC) - timedelta(days=int(period))
         )
 
         if action == AdminAction.BROADCAST and len(parts) == 2:
             count = await self.audience.count(category, since)
             if not count:
                 context.user_data.pop(BROADCAST_DRAFT_KEY, None)
-                await query.edit_message_text(
-                    AdminText.NO_RECIPIENTS, reply_markup=self.menu()
-                )
+                await query.edit_message_text(AdminText.NO_RECIPIENTS, reply_markup=self.menu())
                 return
             draft = BroadcastDraft(uuid4().hex, category, since)
             context.user_data[BROADCAST_DRAFT_KEY] = draft
@@ -170,10 +161,7 @@ class AdminHandler:
             if len(parts) == 2:
                 page = 0
             elif (
-                len(parts) == 3
-                and parts[2].isascii()
-                and parts[2].isdigit()
-                and len(parts[2]) <= 9
+                len(parts) == 3 and parts[2].isascii() and parts[2].isdigit() and len(parts[2]) <= 9
             ):
                 page = int(parts[2])
             else:
@@ -195,38 +183,32 @@ class AdminHandler:
         for row in rows:
             name = " ".join(part for part in (row.first_name, row.last_name) if part)
             name = " ".join(name.split())[:DISPLAY_NAME_LIMIT] or AdminText.NO_NAME
-            username = (
-                f" @{row.username[:DISPLAY_USERNAME_LIMIT]}" if row.username else ""
-            )
+            username = f" @{row.username[:DISPLAY_USERNAME_LIMIT]}" if row.username else ""
             lines.append(f"{name}{username} · {row.telegram_id}")
 
         navigation = []
         if page > 0:
             navigation.append(
-                admin_button(
-                    AdminText.BACK, AdminAction.USERS, category_key, period, page - 1
-                )
+                admin_button(AdminText.BACK, AdminAction.USERS, category_key, period, page - 1)
             )
         if page < last_page:
             navigation.append(
-                admin_button(
-                    AdminText.NEXT, AdminAction.USERS, category_key, period, page + 1
-                )
+                admin_button(AdminText.NEXT, AdminAction.USERS, category_key, period, page + 1)
             )
         buttons = [navigation] if navigation else []
         buttons.append([admin_button(AdminText.MENU, AdminAction.MENU)])
-        await query.edit_message_text(
-            "\n".join(lines), reply_markup=Button.create_markup(buttons)
-        )
+        await query.edit_message_text("\n".join(lines), reply_markup=Button.create_markup(buttons))
 
     async def receive_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.allowed(update):
+        message = update.effective_message
+        user_data = context.user_data
+        if not self.allowed(update) or message is None or user_data is None:
             return
-        draft = context.user_data.get(BROADCAST_DRAFT_KEY)
-        text = update.effective_message.text
-        if draft is None or draft.text is not None or not text.strip():
+        draft = user_data.get(BROADCAST_DRAFT_KEY)
+        text = message.text
+        if draft is None or draft.text is not None or not text or not text.strip():
             return
-        await update.effective_message.reply_text(
+        await message.reply_text(
             text,
             reply_markup=Button.create_markup(
                 [
@@ -240,6 +222,9 @@ class AdminHandler:
         draft.text = text
 
     async def confirm(self, query, context, draft: BroadcastDraft):
+        text = draft.text
+        if text is None:
+            return
         if self.broadcast_task and not self.broadcast_task.done():
             await query.message.reply_text(AdminText.BUSY)
             return
@@ -247,14 +232,10 @@ class AdminHandler:
         recipients = await self.audience.recipient_ids(draft.category, draft.since)
         context.user_data.pop(BROADCAST_DRAFT_KEY)
         if not recipients:
-            await query.edit_message_text(
-                AdminText.NO_RECIPIENTS, reply_markup=self.menu()
-            )
+            await query.edit_message_text(AdminText.NO_RECIPIENTS, reply_markup=self.menu())
             return
 
-        self.broadcast_task = asyncio.create_task(
-            self.broadcast(context.bot, recipients, draft.text)
-        )
+        self.broadcast_task = asyncio.create_task(self.broadcast(context.bot, recipients, text))
         await query.edit_message_text(
             AdminText.STARTED.format(count=len(recipients)),
             reply_markup=self.menu(),
@@ -285,9 +266,7 @@ class AdminHandler:
         try:
             await bot.send_message(
                 chat_id=self.owner_id,
-                text=AdminText.REPORT.format(
-                    total=len(recipients), sent=sent, failed=failed
-                ),
+                text=AdminText.REPORT.format(total=len(recipients), sent=sent, failed=failed),
             )
         except TelegramError as error:
             logger.warning("Broadcast report delivery failed: %s", type(error).__name__)

@@ -16,9 +16,7 @@ def upgrade() -> None:
     inspector = sa.inspect(op.get_bind())
     if inspector.has_table(TABLE_NAME):
         # The old Compose init script created this same schema and constraint name.
-        columns = {
-            column["name"]: column for column in inspector.get_columns(TABLE_NAME)
-        }
+        columns = {column["name"]: column for column in inspector.get_columns(TABLE_NAME)}
         expected = {
             "telegram_id": (sa.BigInteger, False),
             "first_name": (sa.Text, True),
@@ -28,29 +26,27 @@ def upgrade() -> None:
             "created_at": (sa.DateTime, False),
         }
         valid_columns = columns.keys() == expected.keys() and all(
-            isinstance(columns[name]["type"], kind)
-            and columns[name]["nullable"] == nullable
+            isinstance(columns[name]["type"], kind) and columns[name]["nullable"] == nullable
             for name, (kind, nullable) in expected.items()
         )
         primary_key = inspector.get_pk_constraint(TABLE_NAME)["constrained_columns"]
         checks = inspector.get_check_constraints(TABLE_NAME)
+        created_at = columns.get("created_at")
+        created_at_type = created_at["type"] if created_at else None
         if (
             not valid_columns
             or primary_key != ["telegram_id"]
-            or not columns["created_at"]["type"].timezone
+            or not isinstance(created_at_type, sa.DateTime)
+            or not created_at_type.timezone
             or columns["created_at"]["default"] != "now()"
             or not any(check["name"] == CATEGORY_CHECK for check in checks)
         ):
-            raise RuntimeError(
-                "Existing users table does not match the legacy bot schema."
-            )
+            raise RuntimeError("Existing users table does not match the legacy bot schema.")
         return
 
     op.create_table(
         TABLE_NAME,
-        sa.Column(
-            "telegram_id", sa.BigInteger(), primary_key=True, autoincrement=False
-        ),
+        sa.Column("telegram_id", sa.BigInteger(), primary_key=True, autoincrement=False),
         sa.Column("first_name", sa.Text()),
         sa.Column("last_name", sa.Text()),
         sa.Column("username", sa.Text()),

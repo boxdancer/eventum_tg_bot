@@ -1,12 +1,11 @@
 import asyncio
 
 from alembic import context
+from bot.db.models import Base
+from bot.db.session import database_url
 from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
-
-from bot.db.models import Base
-from bot.db.session import database_url
 
 
 def run_migrations(connection):
@@ -30,8 +29,6 @@ async def run_async_migrations():
 
 
 if context.is_offline_mode():
-    raise RuntimeError(
-        "Migrations require a database connection to detect the legacy users table."
-    )
+    raise RuntimeError("Migrations require a database connection to detect the legacy users table.")
 
 asyncio.run(run_async_migrations())

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from constants.audience import AudienceCategory
+from logger_config import get_logger
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,8 +10,6 @@ from telegram import User
 
 from bot.db.models import UserModel
 from bot.db.session import database_url
-from constants.audience import AudienceCategory
-from logger_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -51,9 +51,7 @@ class Audience:
 
     async def set_category(self, telegram_id: int, category: AudienceCategory):
         stmt = (
-            update(UserModel)
-            .where(UserModel.telegram_id == telegram_id)
-            .values(category=category)
+            update(UserModel).where(UserModel.telegram_id == telegram_id).values(category=category)
         )
         await self._write(stmt, telegram_id)
 
@@ -62,9 +60,7 @@ class Audience:
             async with self.sessions.begin() as session:
                 await session.execute(stmt)
         except (SQLAlchemyError, OSError, TimeoutError):
-            logger.exception(
-                "Could not save audience data for Telegram ID %s", telegram_id
-            )
+            logger.exception("Could not save audience data for Telegram ID %s", telegram_id)
 
     @staticmethod
     def _segment(category: AudienceCategory | None, since: datetime | None):
@@ -75,14 +71,8 @@ class Audience:
             conditions.append(UserModel.created_at >= since)
         return conditions
 
-    async def count(
-        self, category: AudienceCategory | None, since: datetime | None
-    ) -> int:
-        stmt = (
-            select(func.count())
-            .select_from(UserModel)
-            .where(*self._segment(category, since))
-        )
+    async def count(self, category: AudienceCategory | None, since: datetime | None) -> int:
+        stmt = select(func.count()).select_from(UserModel).where(*self._segment(category, since))
         async with self.sessions() as session:
             result = await session.execute(stmt)
             return result.scalar_one()

@@ -1,0 +1,300 @@
+import asyncio
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
+from telegram import Bot, Update
+from telegram.constants import ChatType
+from telegram.error import RetryAfter, TelegramError
+from telegram.ext import ContextTypes
+
+from bot.audience import Audience
+from bot.utils.button import Button
+from constants.admin import (
+    ADMIN_CALLBACK_PREFIX,
+    ALL_CATEGORIES,
+    AUDIENCE_PAGE_SIZE,
+    BROADCAST_DELAY_SECONDS,
+    BROADCAST_DRAFT_KEY,
+    CALLBACK_SEPARATOR,
+    CATEGORY_LABELS,
+    DISPLAY_NAME_LIMIT,
+    DISPLAY_USERNAME_LIMIT,
+    PERIOD_LABELS,
+    AdminAction,
+    AdminText,
+    AudiencePeriod,
+)
+from constants.audience import AudienceCategory
+from logger_config import get_logger
+
+logger = get_logger(__name__)
+
+
+def admin_button(label: str, action: AdminAction, *parts: str | int) -> Button:
+    callback = CALLBACK_SEPARATOR.join(str(part) for part in (action, *parts))
+    return Button(label, callback_data=f"{ADMIN_CALLBACK_PREFIX}{callback}")
+
+
+@dataclass
+class BroadcastDraft:
+    token: str
+    category: AudienceCategory | None
+    since: datetime | None
+    text: str | None = None
+
+
+class AdminHandler:
+    def __init__(self, audience: Audience, owner_id: int):
+        self.audience = audience
+        self.owner_id = owner_id
+        self.broadcast_task: asyncio.Task | None = None
+
+    def allowed(self, update: Update) -> bool:
+        chat = update.effective_chat
+        user = update.effective_user
+        return bool(
+            chat and chat.type == ChatType.PRIVATE and user and user.id == self.owner_id
+        )
+
+    @staticmethod
+    def menu():
+        return Button.create_markup(
+            [
+                [
+                    admin_button(AdminText.USERS, AdminAction.USERS),
+                    admin_button(AdminText.BROADCAST, AdminAction.BROADCAST),
+                ]
+            ]
+        )
+
+    async def open(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if self.allowed(update):
+            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+            await update.effective_message.reply_text(
+                AdminText.TITLE, reply_markup=self.menu()
+            )
+
+    async def callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        if not self.allowed(update):
+            await query.answer(AdminText.DENIED, show_alert=True)
+            return
+
+        await query.answer()
+        action, *parts = query.data.removeprefix(ADMIN_CALLBACK_PREFIX).split(
+            CALLBACK_SEPARATOR
+        )
+        try:
+            action = AdminAction(action)
+        except ValueError:
+            return
+
+        if action == AdminAction.MENU and not parts:
+            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+            await query.edit_message_text(AdminText.TITLE, reply_markup=self.menu())
+        elif action in (AdminAction.USERS, AdminAction.BROADCAST):
+            await self.choose_segment(query, context, action, parts)
+        elif action in (AdminAction.SEND, AdminAction.CANCEL) and len(parts) == 1:
+            draft = context.user_data.get(BROADCAST_DRAFT_KEY)
+            if draft is None or draft.token != parts[0]:
+                return
+            if action == AdminAction.SEND and draft.text is not None:
+                await self.confirm(query, context, draft)
+            elif action == AdminAction.CANCEL:
+                context.user_data.pop(BROADCAST_DRAFT_KEY)
+                await query.edit_message_text(
+                    AdminText.CANCELLED, reply_markup=self.menu()
+                )
+
+    async def choose_segment(
+        self, query, context, action: AdminAction, parts: list[str]
+    ):
+        back = [admin_button(AdminText.MENU, AdminAction.MENU)]
+        if not parts:
+            buttons = [
+                admin_button(label, action, key)
+                for key, label in CATEGORY_LABELS.items()
+            ]
+            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+            await query.edit_message_text(
+                AdminText.CHOOSE_CATEGORY,
+                reply_markup=Button.create_markup([buttons, back]),
+            )
+            return
+
+        category_key = parts[0]
+        if category_key not in CATEGORY_LABELS:
+            return
+        if len(parts) == 1:
+            buttons = [
+                admin_button(label, action, category_key, key)
+                for key, label in PERIOD_LABELS.items()
+            ]
+            context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+            await query.edit_message_text(
+                AdminText.CHOOSE_PERIOD,
+                reply_markup=Button.create_markup([buttons, back]),
+            )
+            return
+
+        period = parts[1]
+        if period not in PERIOD_LABELS:
+            return
+        category = (
+            None if category_key == ALL_CATEGORIES else AudienceCategory(category_key)
+        )
+        since = (
+            None
+            if period == AudiencePeriod.ALL
+            else datetime.now(timezone.utc) - timedelta(days=int(period))
+        )
+
+        if action == AdminAction.BROADCAST and len(parts) == 2:
+            count = await self.audience.count(category, since)
+            if not count:
+                context.user_data.pop(BROADCAST_DRAFT_KEY, None)
+                await query.edit_message_text(
+                    AdminText.NO_RECIPIENTS, reply_markup=self.menu()
+                )
+                return
+            draft = BroadcastDraft(uuid4().hex, category, since)
+            context.user_data[BROADCAST_DRAFT_KEY] = draft
+            await query.edit_message_text(
+                AdminText.ENTER_TEXT.format(count=count),
+                reply_markup=Button.create_markup(
+                    [[admin_button(AdminText.CANCEL, AdminAction.CANCEL, draft.token)]]
+                ),
+            )
+        elif action == AdminAction.USERS:
+            if len(parts) == 2:
+                page = 0
+            elif (
+                len(parts) == 3
+                and parts[2].isascii()
+                and parts[2].isdigit()
+                and len(parts[2]) <= 9
+            ):
+                page = int(parts[2])
+            else:
+                return
+            await self.show_users(query, category_key, category, period, since, page)
+
+    async def show_users(self, query, category_key, category, period, since, page):
+        count = await self.audience.count(category, since)
+        last_page = max(0, (count - 1) // AUDIENCE_PAGE_SIZE)
+        page = min(page, last_page)
+        rows = await self.audience.page(
+            category, since, offset=page * AUDIENCE_PAGE_SIZE, limit=AUDIENCE_PAGE_SIZE
+        )
+        lines = [
+            f"{CATEGORY_LABELS[category_key]} · {PERIOD_LABELS[period]}",
+            AdminText.PAGE.format(count=count, page=page + 1, pages=last_page + 1),
+            "",
+        ]
+        for row in rows:
+            name = " ".join(part for part in (row.first_name, row.last_name) if part)
+            name = " ".join(name.split())[:DISPLAY_NAME_LIMIT] or AdminText.NO_NAME
+            username = (
+                f" @{row.username[:DISPLAY_USERNAME_LIMIT]}" if row.username else ""
+            )
+            lines.append(f"{name}{username} · {row.telegram_id}")
+
+        navigation = []
+        if page > 0:
+            navigation.append(
+                admin_button(
+                    AdminText.BACK, AdminAction.USERS, category_key, period, page - 1
+                )
+            )
+        if page < last_page:
+            navigation.append(
+                admin_button(
+                    AdminText.NEXT, AdminAction.USERS, category_key, period, page + 1
+                )
+            )
+        buttons = [navigation] if navigation else []
+        buttons.append([admin_button(AdminText.MENU, AdminAction.MENU)])
+        await query.edit_message_text(
+            "\n".join(lines), reply_markup=Button.create_markup(buttons)
+        )
+
+    async def receive_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.allowed(update):
+            return
+        draft = context.user_data.get(BROADCAST_DRAFT_KEY)
+        text = update.effective_message.text
+        if draft is None or draft.text is not None or not text.strip():
+            return
+        await update.effective_message.reply_text(
+            text,
+            reply_markup=Button.create_markup(
+                [
+                    [
+                        admin_button(AdminText.CONFIRM, AdminAction.SEND, draft.token),
+                        admin_button(AdminText.CANCEL, AdminAction.CANCEL, draft.token),
+                    ]
+                ]
+            ),
+        )
+        draft.text = text
+
+    async def confirm(self, query, context, draft: BroadcastDraft):
+        if self.broadcast_task and not self.broadcast_task.done():
+            await query.message.reply_text(AdminText.BUSY)
+            return
+
+        recipients = await self.audience.recipient_ids(draft.category, draft.since)
+        context.user_data.pop(BROADCAST_DRAFT_KEY)
+        if not recipients:
+            await query.edit_message_text(
+                AdminText.NO_RECIPIENTS, reply_markup=self.menu()
+            )
+            return
+
+        self.broadcast_task = asyncio.create_task(
+            self.broadcast(context.bot, recipients, draft.text)
+        )
+        await query.edit_message_text(
+            AdminText.STARTED.format(count=len(recipients)),
+            reply_markup=self.menu(),
+        )
+
+    async def broadcast(self, bot: Bot, recipients: list[int], text: str):
+        sent = 0
+        logger.info("Broadcast started: recipients=%s", len(recipients))
+        for index, telegram_id in enumerate(recipients):
+            if index:
+                await asyncio.sleep(BROADCAST_DELAY_SECONDS)
+            while True:
+                try:
+                    await bot.send_message(chat_id=telegram_id, text=text)
+                    sent += 1
+                    break
+                except RetryAfter as error:
+                    await asyncio.sleep(error.retry_after)
+                except TelegramError as error:
+                    logger.warning(
+                        "Broadcast delivery failed for %s: %s",
+                        telegram_id,
+                        type(error).__name__,
+                    )
+                    break
+        failed = len(recipients) - sent
+        logger.info("Broadcast finished: sent=%s failed=%s", sent, failed)
+        try:
+            await bot.send_message(
+                chat_id=self.owner_id,
+                text=AdminText.REPORT.format(
+                    total=len(recipients), sent=sent, failed=failed
+                ),
+            )
+        except TelegramError as error:
+            logger.warning("Broadcast report delivery failed: %s", type(error).__name__)
+
+    async def stop(self):
+        if self.broadcast_task is not None:
+            if not self.broadcast_task.done():
+                logger.info("Cancelling active broadcast on shutdown")
+                self.broadcast_task.cancel()
+            await asyncio.gather(self.broadcast_task, return_exceptions=True)

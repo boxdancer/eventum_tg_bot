@@ -9,6 +9,9 @@ class ExamType(str, enum.Enum):
     EGE_BASE = "ЕГЭ база"
 
 
+MATERIAL_CALLBACK_PREFIX = "material:"
+
+
 class MaterialKey(str, enum.Enum):
     # ЕГЭ профиль
     EGE_PROFILE_1 = "ege_profile_1"
@@ -26,6 +29,7 @@ class MaterialKey(str, enum.Enum):
 
 class Command(str, enum.Enum):
     START = "start"
+    ADMIN = "admin"
     PLAN_OGE = "plan_oge"
     PLAN_EGE_PROFILE = "plan_ege_profile"
     PLAN_EGE_BASE = "plan_ege_base"
@@ -72,12 +76,8 @@ def __prepare_photo_data(file_name: str):
         return photo.read()
 
 
-# Subscription channel
-CHECK_SUBSCRIPTION_CHANNEL = "https://t.me/celina_math"
-CHECK_SUBSCRIPTION_CHANNEL_USERNAME = CHECK_SUBSCRIPTION_CHANNEL.split("/")[-1]
 SUBSCRIPTION_REQUIRED_MESSAGE = (
     "🔒 *Для доступа к материалам необходимо подписаться на наш канал\!*\n\n"
-    "Подпишись на канал \@celina\_math, чтобы получить доступ ко всем материалам\.\n\n"
     "После подписки нажми на кнопку снова\."
 )
 
@@ -85,9 +85,11 @@ SUBSCRIPTION_REQUIRED_MESSAGE = (
 GREETING_PHOTO = __prepare_photo_data("GREETING_PHOTO")
 
 # Message Text Constants
-GREETING_MESSAGE = ("Привет\! Я *Наташа Целина*, репетитор по математике для школьников с 5 по 11 класс\."
-                    " Мой ТГ канал\: \@celina\_math\. Присоединяйся, там много полезного контента по подготовке\!"
-                    " Какой экзамен сдаёшь\?")
+GREETING_MESSAGE = (
+    "Привет\! Я *Наташа Целина*, репетитор по математике для школьников с 5 по 11 класс\."
+    " Мой ТГ канал\: \@celina\_math\. Присоединяйся, там много полезного контента по подготовке\!"
+    " Какой экзамен сдаёшь\?"
+)
 
 # ЕГЭ профиль messages
 EGE_PROFILE_MESSAGE_1 = """*Вот обещанный файл по стереометрии, в нём:* 
@@ -139,9 +141,7 @@ _Почему важно пройти тест?_
 _Этот тест — это не проверка знаний ради галочки\._ *Это шаг к системе\.* После него я отправлю тебе разбор ошибок и рекомендации, как двигаться дальше\. 
 __Присылай фото с решением:__ @natashkatse"""
 TEXT_EGE_PROFILE_BTN_4 = "Пройти тест"
-URL_EGE_PROFILE_BTN_4 = (
-    "https://drive.google.com/file/d/1s2ol2mLqPuHfv-R0YywTnY9yHFmwND3p/view?usp=drive_link"
-)
+URL_EGE_PROFILE_BTN_4 = "https://drive.google.com/file/d/1s2ol2mLqPuHfv-R0YywTnY9yHFmwND3p/view?usp=drive_link"
 
 # ЕГЭ база messages
 EGE_BASE_MESSAGE_1 = """*Вот обещанный файл по стереометрии, в нём:*
@@ -183,9 +183,7 @@ _Почему важно пройти тест?_
 _Этот тест — это не проверка знаний ради галочки\._ *Это шаг к системе\.* После него я отправлю тебе разбор ошибок и рекомендации, как двигаться дальше\. 
 __Присылай фото с решением:__ @natashkatse"""
 TEXT_EGE_BASE_BTN_4 = "Пройти тест"
-URL_EGE_BASE_BTN_4 = (
-    "https://drive.google.com/file/d/1vW3voXGUtaafiQxItaQeO4kjF5BBk_YG/view?usp=drive_link"
-)
+URL_EGE_BASE_BTN_4 = "https://drive.google.com/file/d/1vW3voXGUtaafiQxItaQeO4kjF5BBk_YG/view?usp=drive_link"
 
 OGE_MESSAGE_1 = """ *Вот обещанный файл по «Шинам», в нём:* 
 ✅ собраны и решены все прототипы, которые могут попасться в номерах с 1 по 5
@@ -236,9 +234,7 @@ _Почему важно пройти тест?_
 _Этот тест — это не проверка знаний ради галочки\._ *Это шаг к системе\.* После него я отправлю тебе разбор ошибок и рекомендации, как двигаться дальше\. 
 __Присылай фото с решением:__ @natashkatse"""
 TEXT_OGE_BTN_4 = "Пройти тест"
-URL_OGE_BTN_4 = (
-    "https://drive.google.com/file/d/1d131NqQ8XfIW0l4wUDuGmJHog8BWvfpl/view?usp=drive_link"
-)
+URL_OGE_BTN_4 = "https://drive.google.com/file/d/1d131NqQ8XfIW0l4wUDuGmJHog8BWvfpl/view?usp=drive_link"
 
 # Free videolesson message (no button, text only)
 FREE_VIDEOLESSON_MESSAGE = """У меня есть для тебя *бесплатный видеоурок*, который поможет разобраться с одной важной темой по математике и убрать пробелы, из\-за которых чаще всего возникают ошибки\.
@@ -250,13 +246,25 @@ FREE_VIDEOLESSON_MESSAGE = """У меня есть для тебя *беспла
 # Materials: MaterialKey -> Material(message, button_text, url)
 MATERIALS = {
     # ЕГЭ профиль
-    MaterialKey.EGE_PROFILE_1: Material(EGE_PROFILE_MESSAGE_1, TEXT_EGE_PROFILE_BTN_1, URL_EGE_PROFILE_BTN_1),
-    MaterialKey.EGE_PROFILE_3: Material(EGE_PROFILE_MESSAGE_3, TEXT_EGE_PROFILE_BTN_3, URL_EGE_PROFILE_BTN_3),
-    MaterialKey.EGE_PROFILE_4: Material(EGE_PROFILE_MESSAGE_4, TEXT_EGE_PROFILE_BTN_4, URL_EGE_PROFILE_BTN_4),
+    MaterialKey.EGE_PROFILE_1: Material(
+        EGE_PROFILE_MESSAGE_1, TEXT_EGE_PROFILE_BTN_1, URL_EGE_PROFILE_BTN_1
+    ),
+    MaterialKey.EGE_PROFILE_3: Material(
+        EGE_PROFILE_MESSAGE_3, TEXT_EGE_PROFILE_BTN_3, URL_EGE_PROFILE_BTN_3
+    ),
+    MaterialKey.EGE_PROFILE_4: Material(
+        EGE_PROFILE_MESSAGE_4, TEXT_EGE_PROFILE_BTN_4, URL_EGE_PROFILE_BTN_4
+    ),
     # ЕГЭ база
-    MaterialKey.EGE_BASE_1: Material(EGE_BASE_MESSAGE_1, TEXT_EGE_BASE_BTN_1, URL_EGE_BASE_BTN_1),
-    MaterialKey.EGE_BASE_3: Material(EGE_BASE_MESSAGE_3, TEXT_EGE_BASE_BTN_3, URL_EGE_BASE_BTN_3),
-    MaterialKey.EGE_BASE_4: Material(EGE_BASE_MESSAGE_4, TEXT_EGE_BASE_BTN_4, URL_EGE_BASE_BTN_4),
+    MaterialKey.EGE_BASE_1: Material(
+        EGE_BASE_MESSAGE_1, TEXT_EGE_BASE_BTN_1, URL_EGE_BASE_BTN_1
+    ),
+    MaterialKey.EGE_BASE_3: Material(
+        EGE_BASE_MESSAGE_3, TEXT_EGE_BASE_BTN_3, URL_EGE_BASE_BTN_3
+    ),
+    MaterialKey.EGE_BASE_4: Material(
+        EGE_BASE_MESSAGE_4, TEXT_EGE_BASE_BTN_4, URL_EGE_BASE_BTN_4
+    ),
     # ОГЭ
     MaterialKey.OGE_1: Material(OGE_MESSAGE_1, TEXT_OGE_BTN_1, URL_OGE_BTN_1),
     MaterialKey.OGE_3: Material(OGE_MESSAGE_3, TEXT_OGE_BTN_3, URL_OGE_BTN_3),

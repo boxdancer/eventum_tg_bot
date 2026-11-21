@@ -1,28 +1,34 @@
-import asyncio
 import os
+import re
 from io import BytesIO
 from functools import partial
 
 from dotenv import load_dotenv
-from telegram import Update, Bot, BotCommand
-from telegram.constants import ParseMode
+from telegram import BotCommand, Update
+from telegram.constants import ChatType, ParseMode
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
     CallbackQueryHandler,
     Application,
+    MessageHandler,
+    filters,
 )
 
+from bot.audience import Audience
+from bot.handlers.admin import AdminHandler
 from bot.handlers.exam_flow import ExamFlowHandler
 from bot.handlers.material_handler import handle_material_callback
 from bot.utils.button import Button
 from bot.utils.message_scheduler import MessageScheduler
-from bot.utils.subscription_checker import requires_subscription
+from bot.utils.subscription_checker import requires_subscription, subscription_channel
+from constants.admin import ADMIN_CALLBACK_PREFIX
 from constants.constants import (
     GREETING_MESSAGE,
     GREETING_PHOTO,
     ExamType,
+    MATERIAL_CALLBACK_PREFIX,
     MATERIALS,
     COMMAND_MATERIALS,
     COMMAND_DESCRIPTIONS,
@@ -42,23 +48,36 @@ if not TOKEN:
 
 
 class BotHandler:
-    def __init__(self, token: str):
-        self.token = token
-        self.bot = Bot(token=self.token)
-        self.application: Application = ApplicationBuilder().token(self.token).build()
-        self.scheduler = MessageScheduler()
-        self.exam_flow = ExamFlowHandler(self.scheduler, owner_id=OWNER_ID)
+    def __init__(self, token: str, owner_id: int):
+        self.audience = Audience()
+        self.owner_id = owner_id
+        self.admin = AdminHandler(self.audience, owner_id)
+        self.exam_flow = ExamFlowHandler(MessageScheduler(), owner_id, self.audience)
+        self.application = (
+            ApplicationBuilder()
+            .token(token)
+            .post_init(self.post_init)
+            .post_stop(self.post_stop)
+            .post_shutdown(self.post_shutdown)
+            .build()
+        )
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        buttons = [[
-            Button(text=ExamType.OGE, callback_data=ExamType.OGE),
-            Button(text=ExamType.EGE_PROFILE, callback_data=ExamType.EGE_PROFILE),
-            Button(text=ExamType.EGE_BASE, callback_data=ExamType.EGE_BASE),
-        ]]
-        
+        user = update.effective_user
+        if update.effective_chat.type == ChatType.PRIVATE and user and user.id:
+            await self.audience.save_user(user)
+
+        buttons = [
+            [
+                Button(text=ExamType.OGE, callback_data=ExamType.OGE),
+                Button(text=ExamType.EGE_PROFILE, callback_data=ExamType.EGE_PROFILE),
+                Button(text=ExamType.EGE_BASE, callback_data=ExamType.EGE_BASE),
+            ]
+        ]
+
         msg = f"/start triggered by user: @{update.message.chat.username}"
-        await context.bot.send_message(chat_id=OWNER_ID, text=msg)
-        
+        await context.bot.send_message(chat_id=self.owner_id, text=msg)
+
         await update.message.reply_photo(
             photo=BytesIO(GREETING_PHOTO),
             caption=GREETING_MESSAGE,
@@ -69,54 +88,90 @@ class BotHandler:
 
     @requires_subscription
     async def handle_material_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE, material_key: MaterialKey
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        material_key: MaterialKey,
     ):
         """Generic handler for material commands."""
         material = MATERIALS[material_key]
         await update.message.reply_text(
             text=material.message,
-            reply_markup=Button.create_markup([[Button(material.button_text, url=material.url)]]),
+            reply_markup=Button.create_markup(
+                [[Button(material.button_text, url=material.url)]]
+            ),
             parse_mode=ParseMode.MARKDOWN_V2,
         )
 
     @requires_subscription
-    async def free_videolesson(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def free_videolesson(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Handler for /free_videolesson command."""
         await update.message.reply_text(
             text=FREE_VIDEOLESSON_MESSAGE,
             parse_mode=ParseMode.MARKDOWN_V2,
         )
 
-    async def run(self):
-        pending_updates = await self.bot.get_updates()
-        logger.info("❗ Messages skipped while bot inactive: %s", len(pending_updates))
+    async def post_init(self, application: Application):
+        await self.audience.open()
+        await application.bot.set_my_commands(
+            [
+                BotCommand(command=cmd, description=desc)
+                for cmd, desc in COMMAND_DESCRIPTIONS.items()
+            ]
+        )
 
-        await self.bot.set_my_commands([
-            BotCommand(command=cmd, description=desc)
-            for cmd, desc in COMMAND_DESCRIPTIONS.items()
-        ])
+    async def post_stop(self, application: Application):
+        await self.admin.stop()
+        await self.exam_flow.stop()
 
+    async def post_shutdown(self, application: Application):
+        await self.audience.close()
+
+    def run(self):
         self.application.add_handler(CommandHandler(Command.START, self.start))
-        self.application.add_handler(CommandHandler(Command.FREE_VIDEOLESSON, self.free_videolesson))
-        
-        # Register material commands dynamically
+        self.application.add_handler(
+            CommandHandler(Command.FREE_VIDEOLESSON, self.free_videolesson)
+        )
+
         for cmd, material_key in COMMAND_MATERIALS.items():
             handler = partial(self.handle_material_command, material_key=material_key)
             self.application.add_handler(CommandHandler(cmd, handler))
 
-        self.application.add_handler(CallbackQueryHandler(self.exam_flow.handle_choice))
+        exam_choices = "|".join(re.escape(exam.value) for exam in ExamType)
         self.application.add_handler(
-            CallbackQueryHandler(handle_material_callback, pattern="^material:")
+            CallbackQueryHandler(
+                self.exam_flow.handle_choice, pattern=rf"\A(?:{exam_choices})\Z"
+            )
         )
-
-        await self.application.initialize()
-        await self.application.start()
-        await self.application.updater.start_polling(drop_pending_updates=True)
-
-        logger.info("🟢 Telegram bot started...")
-        await asyncio.Event().wait()
+        self.application.add_handler(
+            CallbackQueryHandler(
+                handle_material_callback, pattern=f"^{MATERIAL_CALLBACK_PREFIX}"
+            )
+        )
+        self.application.add_handler(CommandHandler(Command.ADMIN, self.admin.open))
+        self.application.add_handler(
+            CallbackQueryHandler(
+                self.admin.callback, pattern=f"^{ADMIN_CALLBACK_PREFIX}"
+            )
+        )
+        self.application.add_handler(
+            MessageHandler(
+                filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND,
+                self.admin.receive_text,
+            )
+        )
+        self.application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-    bot_handler = BotHandler(TOKEN)
-    asyncio.run(bot_handler.run())
+    subscription_channel()
+    if (
+        not OWNER_ID
+        or not OWNER_ID.isascii()
+        or not OWNER_ID.isdecimal()
+        or int(OWNER_ID) <= 0
+    ):
+        raise ValueError("OWNER_ID must be a positive numeric Telegram user ID")
+    BotHandler(TOKEN, int(OWNER_ID)).run()

@@ -25,7 +25,7 @@ from ..utils.button import Button
 
 class BaseExamHandler(IExamHandler):
     """Base handler for exam flow with message sequence."""
-    
+
     messages: list = []  # [(msg_text, delay, MaterialKey | None), ...]
 
     def __init__(self, scheduler, exam_flow):
@@ -39,7 +39,9 @@ class BaseExamHandler(IExamHandler):
                 material = MATERIALS[material_key]
                 button = Button(material.button_text, url=material.url)
             self.exam_flow.track_task(
-                self.scheduler.send_delayed_message(message, msg_text, delay, username, button)
+                self.scheduler.send_delayed_message(
+                    message, msg_text, delay, username, button
+                )
             )
 
 

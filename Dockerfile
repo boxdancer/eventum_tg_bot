@@ -9,10 +9,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock* /app/
 
 # Синхронизируем зависимости
-RUN uv sync
+RUN uv sync --locked --no-dev
 
 # Копируем остальной проект
 COPY . /app
 
-# Запуск напрямую скрипта
-CMD ["uv", "run", "python", "-m", "bot.tg_bot"]
+ENTRYPOINT ["/bin/sh", "/app/docker/entrypoint.sh"]
+CMD [".venv/bin/python", "-m", "bot.tg_bot"]

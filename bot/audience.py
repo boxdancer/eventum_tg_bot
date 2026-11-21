@@ -69,7 +69,7 @@ class Audience:
         try:
             async with self.sessions.begin() as session:
                 await session.execute(stmt)
-        except (SQLAlchemyError, OSError, TimeoutError):
+        except SQLAlchemyError, OSError, TimeoutError:
             logger.exception("Could not save audience data for Telegram ID %s", telegram_id)
 
     @staticmethod

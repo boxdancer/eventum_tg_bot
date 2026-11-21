@@ -1,7 +1,7 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Копируем uv бинарники
-COPY --from=ghcr.io/astral-sh/uv:0.8.4 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /bin/
 
 WORKDIR /app
 

@@ -13,6 +13,6 @@ class Button:
         return InlineKeyboardButton(self.text, url=self.url, callback_data=self.callback_data)
 
     @staticmethod
-    def create_markup(buttons: list[list["Button"]]) -> InlineKeyboardMarkup:
+    def create_markup(buttons: list[list[Button]]) -> InlineKeyboardMarkup:
         keyboard = [[button.to_telegram() for button in row] for row in buttons]
         return InlineKeyboardMarkup(keyboard)

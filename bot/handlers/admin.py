@@ -273,7 +273,10 @@ class AdminHandler:
                     sent += 1
                     break
                 except RetryAfter as error:
-                    await asyncio.sleep(error.retry_after)
+                    delay = error.retry_after
+                    await asyncio.sleep(
+                        delay.total_seconds() if isinstance(delay, timedelta) else delay
+                    )
                 except TelegramError as error:
                     logger.warning(
                         "Broadcast delivery failed for %s: %s",

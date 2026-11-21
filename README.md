@@ -1,6 +1,6 @@
 # Telegram-бот
 
-Бот работает на Python 3.11, `python-telegram-bot` 20.x и PostgreSQL. Точка входа — `bot/tg_bot.py`, зависимости управляются через `uv`.
+Бот работает на Python 3.14, `python-telegram-bot` 22.x и PostgreSQL. Точка входа — `bot/tg_bot.py`, зависимости управляются через `uv`.
 
 ## Запуск в Docker Compose
 
